@@ -41,6 +41,18 @@ exports.getAllUsers = async (req, res) => {
     });
   }
 };
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("-passwordHash");
+    if (!user) return res.status(404).json({ 
+      success:false,
+      message:"User not found"
+    });
+    res.json({ success:true, data:user });
+  } catch (err) {
+    res.status(500).json({ success:false, message:"Server error" });
+  }
+};
 
 
 module.exports = exports;
