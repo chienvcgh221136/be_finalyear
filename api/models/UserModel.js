@@ -1,3 +1,5 @@
+
+
 const mongoose = require("mongoose");
 
 const UserSchema = new mongoose.Schema(
@@ -7,6 +9,7 @@ const UserSchema = new mongoose.Schema(
     passwordHash: {type: String, required: true},
     phone: {type: String, required: true, unique: true, trim: true},
     role: {type: String, enum: ["USER", "ADMIN"], default: "USER",},
+    refreshToken: String,
     isVerified: {type: Boolean, default: false},
     isBanned: {type: Boolean, default: false},
     rating: {type: Number, default: 0, min: 0, max: 5},
