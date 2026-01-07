@@ -13,8 +13,13 @@ const UserSchema = new mongoose.Schema(
     isVerified: {type: Boolean, default: false},
     isBanned: {type: Boolean, default: false},
     rating: {type: Number, default: 0, min: 0, max: 5},
-    totalReviews: {type: Number, default: 0}
+    totalReviews: {type: Number, default: 0},
+    vip: {
+      isActive: { type:Boolean, default:false },
+      expiredAt: { type:Date }
+    }
   },
+  
   { 
     timestamps: true,
     collection: 'users' 

@@ -10,6 +10,7 @@ const leadRoutes=require("./api/routes/leadRoutes");
 const appointmentRoutes=require("./api/routes/appointmentRoutes");
 const favoriteRoutes=require("./api/routes/favoriteRoutes");
 const reviewRoutes=require("./api/routes/reviewRoutes");
+const adminRoutes = require("./api/routes/adminRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +26,7 @@ app.use("/api/leads",leadRoutes);
 app.use("/api/appointments",appointmentRoutes);
 app.use("/api/favorites",favoriteRoutes);
 app.use("/api/reviews",reviewRoutes);
+app.use("/api/admin", adminRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)
