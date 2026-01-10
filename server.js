@@ -11,6 +11,7 @@ const appointmentRoutes=require("./api/routes/appointmentRoutes");
 const favoriteRoutes=require("./api/routes/favoriteRoutes");
 const reviewRoutes=require("./api/routes/reviewRoutes");
 const adminRoutes = require("./api/routes/adminRoutes");
+const reportRoutes = require("./api/routes/reportRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,8 @@ app.use("/api/appointments",appointmentRoutes);
 app.use("/api/favorites",favoriteRoutes);
 app.use("/api/reviews",reviewRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/reports", reportRoutes);
+
 
 mongoose
   .connect(process.env.MONGO_URI)
