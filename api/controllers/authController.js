@@ -78,7 +78,7 @@ exports.login = async (req, res) => {
         const accessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "15m" }
+            { expiresIn: "1d" }
         );
 
         const refreshToken = jwt.sign(
@@ -95,7 +95,7 @@ exports.login = async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 15 * 60 * 1000 // 15 minutes
+            maxAge: 1 * 24 * 60 * 60 * 1000 // 1 day
         });
 
         res.cookie('refreshToken', refreshToken, {
@@ -141,14 +141,14 @@ exports.refreshToken = async (req, res) => {
         const newAccessToken = jwt.sign(
             { userId: user._id, role: user.role },
             process.env.JWT_SECRET,
-            { expiresIn: "15m" }
+            { expiresIn: "1d" }
         );
 
         res.cookie('accessToken', newAccessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 15 * 60 * 1000
+            maxAge: 1 * 24 * 60 * 60 * 1000
         });
 
         res.json({ success: true, accessToken: newAccessToken });

@@ -1,28 +1,44 @@
-const mongoose=require("mongoose");
+const mongoose = require("mongoose");
 
-const PostSchema=new mongoose.Schema({
- userId:{type:mongoose.Schema.Types.ObjectId,ref:"User",required:true},
- title:{type:String,required:true},
- description:{type:String},
- transactionType:{type:String,enum:["RENT","SALE"],required:true},
- propertyType:{type:String,enum:["ROOM","HOUSE","APARTMENT"],required:true},
- roomType:{type:String,enum:["MOTEL","MINI_APT"],default:null},
- price:{type:Number,required:true},
- deposit:{type:Number,default:0},
- area:{type:Number},
- district:{type:String},
- city:{type:String},
- bedrooms:{type:Number},
- bathrooms:{type:Number},
- images:[String],
- redbookImages:[String],
- status:{type:String,enum:["PENDING","ACTIVE","REJECTED","SOLD"],default:"PENDING"},
- 
- rejectReason:{type:String,default:null},
+const PostSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    title: { type: String, required: true },
+    description: { type: String },
+    transactionType: { type: String, enum: ["RENT", "SALE"], required: true },
+    propertyType: { type: String, enum: ["APARTMENT", "HOUSE", "LAND", "OFFICE", "SHOPHOUSE"], required: true },
+    apartmentType: { type: String, enum: ["MINI", "DORM", "SERVICED", "STUDIO", "OFFICETEL", "PENTHOUSE", "DUPLEX", "HIGH_END"], default: null },
+    price: { type: Number, required: true },
+    deposit: { type: Number, default: 0 },
+    area: { type: Number },
 
- isVip:{type:Boolean,default:false},
- priorityScore:{type:Number,default:0},
- viewCount:{type:Number,default:0}
-},{timestamps:true,collection:"posts"});
+    // Nested Address
+    address: {
+        street: { type: String },
+        ward: { type: String },
+        district: { type: String, required: true },
+        city: { type: String, required: true }
+    },
 
-module.exports=mongoose.model("Post",PostSchema);
+    // Flattened address fields for backward compatibility or easier querying if needed (Optional, but better to migrate to nested)
+    // For now, we removed top-level district/city from schema to strictly use address object, 
+    // OR we can keep them as aliases if existing code relies heavily on them. 
+    // The user request showed nested address. Let's stick to nested.
+
+    bedrooms: { type: Number },
+    bathrooms: { type: Number },
+    floor: { type: Number },
+    totalFloors: { type: Number },
+    furniture: { type: String, enum: ["NONE", "BASIC", "FULL"], default: "NONE" },
+
+    images: [String],
+    redbookImages: [String],
+    status: { type: String, enum: ["PENDING", "ACTIVE", "REJECTED", "SOLD"], default: "PENDING" },
+
+    rejectReason: { type: String, default: null },
+
+    isVip: { type: Boolean, default: false },
+    priorityScore: { type: Number, default: 0 },
+    viewCount: { type: Number, default: 0 }
+}, { timestamps: true, collection: "posts" });
+
+module.exports = mongoose.model("Post", PostSchema);
