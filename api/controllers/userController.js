@@ -4,9 +4,9 @@ exports.getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-passwordHash");
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
     res.json({
@@ -15,18 +15,18 @@ exports.getUserById = async (req, res) => {
     });
   } catch (err) {
     console.error("Error getting user:", err);
-    res.status(400).json({ 
+    res.status(400).json({
       success: false,
       message: "Invalid user id",
-      error: err.message 
+      error: err.message
     });
   }
 };
 
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role:"USER" }).select("-passwordHash");
-    
+    const users = await User.find({ role: "USER" }).select("-passwordHash");
+
     res.json({
       success: true,
       count: users.length,
@@ -34,23 +34,55 @@ exports.getAllUsers = async (req, res) => {
     });
   } catch (err) {
     console.error("Error getting users:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: "Error fetching users",
-      error: err.message 
+      error: err.message
     });
   }
 };
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select("-passwordHash");
-    if (!user) return res.status(404).json({ 
-      success:false,
-      message:"User not found"
+    if (!user) return res.status(404).json({
+      success: false,
+      message: "User not found"
     });
-    res.json({ success:true, data:user });
+    res.json({ success: true, data: user });
   } catch (err) {
-    res.status(500).json({ success:false, message:"Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, phone } = req.body; // Allow updating name and phone
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+
+    await user.save();
+
+    const updatedUser = await User.findById(userId).select("-passwordHash");
+
+    res.json({
+      success: true,
+      data: updatedUser,
+      message: "Profile updated successfully"
+    });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Error updating profile",
+      error: err.message
+    });
   }
 };
 
