@@ -90,10 +90,23 @@ exports.login = async (req, res) => {
         user.refreshToken = refreshToken;
         await user.save();
 
+        // Set Cookies
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000 // 15 minutes
+        });
+
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
         res.json({
             success: true,
-            accessToken,
-            refreshToken,
             user: {
                 id: user._id,
                 name: user.name,
@@ -114,7 +127,7 @@ exports.login = async (req, res) => {
 };
 
 exports.refreshToken = async (req, res) => {
-    const { refreshToken } = req.body;
+    const refreshToken = req.cookies.refreshToken; // Read from cookie
     if (!refreshToken)
         return res.status(400).json({ success: false, message: "Refresh Token is required" });
 
@@ -131,19 +144,30 @@ exports.refreshToken = async (req, res) => {
             { expiresIn: "15m" }
         );
 
+        res.cookie('accessToken', newAccessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000
+        });
+
         res.json({ success: true, accessToken: newAccessToken });
     } catch (err) {
         res.status(403).json({ success: false, message: "Invalid or expired Refresh Token" });
     }
 };
 
-exports.logout = async(req,res)=>{
-  const { refreshToken } = req.body;
-  if(!refreshToken) return res.status(400).json({ message:"Refresh token required" });
+exports.logout = async (req, res) => {
+    const refreshToken = req.cookies.refreshToken;
+    if (refreshToken) {
+        // Optional: clear from DB if you maintain a whitelist/blacklist or strict single assignment
+        // await User.findOneAndUpdate({ refreshToken }, { refreshToken: null });
+        // But simply clearing the cookie is often enough for stateless JWT logout on client side
+    }
 
-  await RefreshToken.deleteOne({ token:refreshToken });
-
-  res.json({ success:true, message:"Logged out successfully" });
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    res.json({ success: true, message: "Logged out successfully" });
 };
 
 
