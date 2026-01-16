@@ -35,6 +35,8 @@ app.use("/api/favorites", favoriteRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reports", reportRoutes);
+const chatRoutes = require("./api/routes/chatRoutes");
+app.use("/api/chat", chatRoutes);
 
 
 mongoose

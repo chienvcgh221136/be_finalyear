@@ -5,16 +5,16 @@ const role = require("../middlewares/roleMiddleware");
 const adminController = require("../controllers/adminController");
 
 router.patch(
- "/users/:userId/ban",
- auth,
- role(["ADMIN"]),
- adminController.banUser
+    "/users/:userId/ban",
+    auth,
+    role(["ADMIN"]),
+    adminController.banUser
 );
 router.patch(
- "/users/:userId/unban",
- auth,
- role(["ADMIN"]),
- adminController.unbanUser
+    "/users/:userId/unban",
+    auth,
+    role(["ADMIN"]),
+    adminController.unbanUser
 );
 
 module.exports = router;
