@@ -1,8 +1,26 @@
 const Post = require("../models/PostModel");
+const User = require("../models/UserModel");
 
 exports.createPost = async (req, res) => {
     try {
-        const post = await Post.create({ ...req.body, userId: req.user.userId });
+        const user = await User.findById(req.user.userId);
+        let postData = { ...req.body, userId: req.user.userId };
+
+        // Apply VIP status if User is VIP and not expired
+        if (user.vip && user.vip.isActive) {
+            const now = new Date();
+            if (!user.vip.expiredAt || new Date(user.vip.expiredAt) > now) {
+                postData.vip = {
+                    isActive: true,
+                    vipType: user.vip.vipType,
+                    priorityScore: user.vip.priorityScore || 0,
+                    startedAt: now,
+                    expiredAt: user.vip.expiredAt // Or based on post duration? Usually inherits user VIP status during creation
+                };
+            }
+        }
+
+        const post = await Post.create(postData);
         res.status(201).json({ success: true, data: post });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -19,14 +37,14 @@ exports.getActivePosts = async (req, res) => {
 
         let query = { status: safeStatus };
 
-        if (isVip === 'true') query.isVip = true;
+        if (isVip === 'true') query['vip.isActive'] = true;
         if (transactionType) query.transactionType = transactionType;
         if (propertyType) query.propertyType = propertyType;
 
         const limitValue = limit ? parseInt(limit) : 0;
 
         const posts = await Post.find(query)
-            .sort({ priorityScore: -1, createdAt: -1 })
+            .sort({ 'vip.priorityScore': -1, createdAt: -1 })
             .limit(limitValue)
             .populate('userId', 'name avatar');
 
