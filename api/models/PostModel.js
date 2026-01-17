@@ -36,8 +36,13 @@ const PostSchema = new mongoose.Schema({
 
     rejectReason: { type: String, default: null },
 
-    isVip: { type: Boolean, default: false },
-    priorityScore: { type: Number, default: 0 },
+    vip: {
+        isActive: { type: Boolean, default: false },
+        vipType: { type: String, default: "NONE" },
+        priorityScore: { type: Number, default: 0 },
+        startedAt: { type: Date, default: null },
+        expiredAt: { type: Date, default: null },
+    },
     viewCount: { type: Number, default: 0 }
 }, { timestamps: true, collection: "posts" });
 
