@@ -17,6 +17,8 @@ const uploadRoutes = require("./api/routes/uploadRoutes");
 const walletRoutes = require("./api/routes/walletRoutes");
 const vipRoutes = require("./api/routes/vipRoutes");
 const statsRoutes = require("./api/routes/statsRoutes");
+const path = require("path");
+const chatRoutes = require("./api/routes/chatRoutes");
 
 const cookieParser = require("cookie-parser");
 
@@ -40,16 +42,8 @@ app.use("/api/favorites", favoriteRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reports", reportRoutes);
-const path = require("path"); // Ensure path is imported
 
-// ... existing code ...
-
-const chatRoutes = require("./api/routes/chatRoutes");
-
-
-// Serve static files from 'uploads' directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 app.use("/api/chat", chatRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/wallet", walletRoutes);
