@@ -6,8 +6,9 @@ const UserSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    passwordHash: { type: String, required: true },
-    phone: { type: String, required: true, unique: true, trim: true },
+    passwordHash: { type: String },
+    phone: { type: String, unique: true, trim: true, sparse: true },
+    googleId: { type: String, unique: true, sparse: true },
     role: { type: String, enum: ["USER", "ADMIN"], default: "USER", },
     refreshToken: String,
     isVerified: { type: Boolean, default: false },

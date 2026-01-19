@@ -170,4 +170,93 @@ exports.logout = async (req, res) => {
     res.json({ success: true, message: "Logged out successfully" });
 };
 
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+exports.googleLogin = async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) return res.status(400).json({ success: false, message: "No token provided" });
+
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        const { sub: googleId, email, name, picture } = payload;
+
+        let user = await User.findOne({
+            $or: [{ googleId }, { email }]
+        });
+
+        if (user) {
+            if (!user.googleId) {
+                user.googleId = googleId;
+                if (!user.avatar) user.avatar = picture;
+                if (user.isVerified === false) user.isVerified = true;
+                await user.save();
+            }
+            if (user.isBanned) {
+                return res.status(403).json({ success: false, message: "User is banned" });
+            }
+        } else {
+            user = await User.create({
+                name,
+                email,
+                googleId,
+                avatar: picture,
+                isVerified: true,
+                role: "USER"
+            });
+        }
+
+        const accessToken = jwt.sign(
+            { userId: user._id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" }
+        );
+
+        const refreshToken = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_REFRESH_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        user.refreshToken = refreshToken;
+        await user.save();
+
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 1 * 24 * 60 * 60 * 1000
+        });
+
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                role: user.role,
+                rating: user.rating,
+                totalReviews: user.totalReviews,
+                avatar: user.avatar
+            }
+        });
+
+    } catch (err) {
+        console.error("Google Login Error:", err);
+        res.status(500).json({ success: false, message: "Google Login failed", error: err.message });
+    }
+};
+
 
