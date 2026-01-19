@@ -6,6 +6,8 @@ const VipPackageSchema = new mongoose.Schema({
     durationDays: { type: Number, required: true },
     priorityScore: { type: Number, required: true },
     description: { type: String },
+    perks: [{ type: String }],
+    limitViewPhone: { type: Number, default: 0 }, // Daily limit for viewing phone numbers
     isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
