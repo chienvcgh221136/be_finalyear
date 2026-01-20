@@ -21,6 +21,11 @@ const MessageItemSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    type: {
+        type: String,
+        enum: ["TEXT", "IMAGE"],
+        default: "TEXT"
+    },
     isRead: {
         type: Boolean,
         default: false
@@ -29,7 +34,7 @@ const MessageItemSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
-}, { _id: false });
+}, { timestamps: true });
 // _id: false because we might not need individual IDs for messages inside the array, 
 // but if the user wants to reference them, we might need them. 
 // Given the sample data provided, the messages inside the array didn't explicitly show _id, 
