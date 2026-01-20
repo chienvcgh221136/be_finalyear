@@ -12,13 +12,23 @@ exports.createOrGetChat = async (req, res) => {
             return res.status(400).json({ success: false, message: "Missing required fields" });
         }
 
-        // Check if chat room exists
+        // Prevent self-chat
+        if (buyerId === sellerId) {
+            return res.status(400).json({ success: false, message: "Không thể tự nhắn tin cho chính mình" });
+        }
+
+        // Check if chat room exists between these two users (regardless of post)
         let chatRoom = await ChatRoom.findOne({
-            postId,
             userIds: { $all: [buyerId, sellerId] }
         });
 
-        if (!chatRoom) {
+        if (chatRoom) {
+            // Chat exists, update the context (postId) to the new post
+            chatRoom.postId = postId;
+            chatRoom.lastMessageAt = Date.now(); // Optional: bump time or just keep
+            await chatRoom.save();
+        } else {
+            // Create new chat room
             chatRoom = await ChatRoom.create({
                 postId,
                 userIds: [buyerId, sellerId],
@@ -51,7 +61,7 @@ exports.getMyChats = async (req, res) => {
         // Use lean() to get plain JavaScript objects we can modify
         const chats = await ChatRoom.find({ userIds: userId })
             .populate("userIds", "name avatar email")
-            .populate("postId", "title images price address")
+            .populate("postId", "title images price address userId") // Added userId to populate
             .sort({ lastMessageAt: -1 })
             .lean();
 
@@ -103,7 +113,7 @@ exports.getMessages = async (req, res) => {
 exports.sendMessage = async (req, res) => {
     try {
         const { chatRoomId } = req.params;
-        const { content } = req.body;
+        const { content, type = "TEXT" } = req.body; // Accept type
         const senderId = req.user.userId;
 
         if (!content) {
@@ -122,6 +132,7 @@ exports.sendMessage = async (req, res) => {
         const newMessage = {
             senderId,
             content,
+            type,
             isRead: false,
             createdAt: new Date()
         };
@@ -132,13 +143,58 @@ exports.sendMessage = async (req, res) => {
 
         // Update ChatRoom lastMessage
         await ChatRoom.findByIdAndUpdate(chatRoomId, {
-            lastMessage: content,
+            lastMessage: type === 'IMAGE' ? '[Hình ảnh]' : content,
             lastMessageAt: new Date()
         });
 
         res.json({ success: true, newMessage });
     } catch (error) {
         console.error("Send message error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Search Messages
+exports.searchMessages = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { query } = req.query;
+
+        if (!query) return res.json({ success: true, results: [] });
+
+        // 1. Find all chats user is involved in
+        const userChats = await ChatRoom.find({ userIds: userId }).select('_id');
+        const chatRoomIds = userChats.map(c => c._id);
+
+        // 2. Search in Message collection
+        // We need to find documents where 'messages.content' matches query
+        // But we want individual messages. Aggregate is best here.
+        const results = await Message.aggregate([
+            { $match: { chatRoomId: { $in: chatRoomIds } } },
+            { $unwind: "$messages" },
+            {
+                $match: {
+                    "messages.content": { $regex: query, $options: "i" }
+                    // Optional: Filter by type TEXT if needed, but maybe searching URL text is okay or not.
+                }
+            },
+            {
+                $project: {
+                    chatRoomId: 1,
+                    message: "$messages"
+                }
+            },
+            { $sort: { "message.createdAt": -1 } },
+            { $limit: 20 }
+        ]);
+
+        // Populate chat info for context (optional, but finding which chat it belongs to is helpful)
+        // We can do a second query to get chat details if needed, or frontend can map id
+
+        res.json({ success: true, results });
+
+    } catch (error) {
+        console.error("Search messages error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -171,6 +227,34 @@ exports.markAsRead = async (req, res) => {
         res.json({ success: true, updated });
     } catch (error) {
         console.error("Mark read error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+// Delete Chat
+exports.deleteChat = async (req, res) => {
+    try {
+        const { chatRoomId } = req.params;
+        const userId = req.user.userId;
+
+        // Check if chat exists and belongs to user
+        const chatRoom = await ChatRoom.findOne({
+            _id: chatRoomId,
+            userIds: userId
+        });
+
+        if (!chatRoom) {
+            return res.status(404).json({ success: false, message: "Chat not found or unauthorized" });
+        }
+
+        // Delete ChatRoom
+        await ChatRoom.findByIdAndDelete(chatRoomId);
+
+        // Delete Messages
+        await Message.findOneAndDelete({ chatRoomId });
+
+        res.json({ success: true, message: "Chat deleted successfully" });
+    } catch (error) {
+        console.error("Delete chat error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

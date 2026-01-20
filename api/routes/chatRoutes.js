@@ -8,8 +8,10 @@ router.use(authenticateUser);
 
 router.post("/create", chatController.createOrGetChat);
 router.get("/my-chats", chatController.getMyChats);
+router.get("/search", chatController.searchMessages); // Added search route
 router.get("/:chatRoomId/messages", chatController.getMessages);
 router.post("/:chatRoomId/send", chatController.sendMessage);
 router.put("/:chatRoomId/read", chatController.markAsRead);
+router.delete("/:chatRoomId", chatController.deleteChat);
 
 module.exports = router;
