@@ -138,3 +138,84 @@ exports.sendWithdrawStatusUpdate = async (to, userName, status, amount, note) =>
         return false;
     }
 };
+exports.sendAppointmentRequestSender = async (to, userName, postTitle, time) => {
+    try {
+        if (!to) return;
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"NhaTot Support" <support@nhatot.com>',
+            to: to,
+            subject: '📅 Xác nhận yêu cầu đặt lịch xem nhà',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #2563eb;">Yêu cầu đã được gửi!</h2>
+                    <p>Xin chào <strong>${userName}</strong>,</p>
+                    <p>Bạn đã gửi yêu cầu xem nhà cho tin đăng: <strong>${postTitle}</strong>.</p>
+                    <p>Thời gian: <strong>${new Date(time).toLocaleString('vi-VN')}</strong></p>
+                    <p>Vui lòng chờ người bán xác nhận. Chúng tôi sẽ thông báo ngay khi có kết quả.</p>
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    <p style="color: #6b7280; font-size: 12px;">Cảm ơn bạn đã sử dụng NhaTot.</p>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending appointment sender email:", error);
+        return false;
+    }
+};
+
+exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postTitle, time, note) => {
+    try {
+        if (!to) return;
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"NhaTot System" <system@nhatot.com>',
+            to: to,
+            subject: '🔔 Bạn có yêu cầu xem nhà mới',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #2563eb;">Yêu cầu xem nhà mới!</h2>
+                    <p>Xin chào <strong>${sellerName}</strong>,</p>
+                    <p>Người dùng <strong>${buyerName}</strong> muốn đặt lịch xem nhà của bạn: <strong>${postTitle}</strong>.</p>
+                    <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 5px 0;"><strong>Thời gian:</strong> ${new Date(time).toLocaleString('vi-VN')}</p>
+                        <p style="margin: 5px 0;"><strong>Ghi chú:</strong> ${note || "Không có"}</p>
+                    </div>
+                    <p>Vui lòng truy cập trang cá nhân để Chấp nhận hoặc Từ chối.</p>
+                    <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/profile?tab=appointments" style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Quản lý lịch hẹn</a>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending appointment receiver email:", error);
+        return false;
+    }
+};
+
+exports.sendAppointmentStatusUpdate = async (to, userName, postTitle, status, time) => {
+    try {
+        if (!to) return;
+        let statusText = status === 'APPROVED' ? 'Được chấp nhận ✅' : 'Bị từ chối ❌';
+        let color = status === 'APPROVED' ? '#16a34a' : '#ef4444';
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"NhaTot Support" <support@nhatot.com>',
+            to: to,
+            subject: `📢 Cập nhật lịch hẹn: ${statusText}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: ${color};">${statusText}</h2>
+                    <p>Xin chào <strong>${userName}</strong>,</p>
+                    <p>Yêu cầu xem nhà <strong>${postTitle}</strong> của bạn vào lúc <strong>${new Date(time).toLocaleString('vi-VN')}</strong> đã <strong>${statusText}</strong>.</p>
+                    ${status === 'APPROVED' ? '<p>Vui lòng đến đúng giờ hoặc liên hệ người bán nếu có thay đổi.</p>' : '<p>Bạn có thể thử đặt lịch vào thời gian khác.</p>'}
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    <p style="color: #6b7280; font-size: 12px;">Cảm ơn bạn đã sử dụng NhaTot.</p>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending appointment status email:", error);
+        return false;
+    }
+};

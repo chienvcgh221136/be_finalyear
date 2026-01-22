@@ -8,7 +8,8 @@ const VipPackageSchema = new mongoose.Schema({
     description: { type: String },
     perks: [{ type: String }],
     limitViewPhone: { type: Number, default: 0 }, // Daily limit for viewing phone numbers
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true },
+    isPopular: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model("VipPackage", VipPackageSchema);

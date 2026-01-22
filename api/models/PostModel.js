@@ -35,6 +35,7 @@ const PostSchema = new mongoose.Schema({
     status: { type: String, enum: ["PENDING", "ACTIVE", "REJECTED", "SOLD"], default: "PENDING" },
 
     rejectReason: { type: String, default: null },
+    approvedAt: { type: Date, default: null },
 
     vip: {
         isActive: { type: Boolean, default: false },

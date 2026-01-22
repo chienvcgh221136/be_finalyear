@@ -1,39 +1,96 @@
-const Appointment=require("../models/AppointmentModel");
-const Post=require("../models/PostModel");
+const Appointment = require("../models/AppointmentModel");
+const Post = require("../models/PostModel");
 
-exports.createAppointment=async(req,res)=>{
- try{
-  const {appointmentTime,note}=req.body;
-  const post=await Post.findById(req.params.postId);
-  if(!post) return res.status(404).json({success:false,message:"Post not found"});
+const User = require("../models/UserModel");
 
-  const ap=await Appointment.create({
-   postId:post._id,
-   buyerId:req.user.userId,
-   sellerId:post.userId,
-   appointmentTime,
-   note
-  });
+const emailService = require("../services/emailService");
 
-  res.json({success:true,data:ap});
- }catch(e){res.status(500).json({success:false,message:e.message});}
+exports.createAppointment = async (req, res) => {
+    try {
+        const { appointmentTime, note } = req.body;
+        // Populate seller to get email
+        const post = await Post.findById(req.params.postId).populate("userId", "name email");
+        if (!post) return res.status(404).json({ success: false, message: "Post not found" });
+
+        // Populate buyer (current user) to get fields
+        const buyer = await User.findById(req.user.userId);
+        if (!buyer) return res.status(404).json({ success: false, message: "Buyer not found" });
+
+        console.log("Creating appointment. Post:", post.title, "Seller:", post.userId.email, "Buyer:", buyer.email);
+
+        const ap = await Appointment.create({
+            postId: post._id,
+            buyerId: req.user.userId,
+            sellerId: post.userId._id, // post.userId is now an object
+            appointmentTime,
+            note
+        });
+
+        // Send Email to Sender (Buyer)
+        emailService.sendAppointmentRequestSender(buyer.email, buyer.name, post.title, appointmentTime);
+
+        // Send Email to Receiver (Seller)
+        emailService.sendAppointmentRequestReceiver(post.userId.email, post.userId.name, buyer.name, post.title, appointmentTime, note);
+
+        res.json({ success: true, data: ap });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
-exports.updateStatus=async(req,res)=>{
- try{
-  const ap=await Appointment.findById(req.params.id);
-  if(!ap) return res.status(404).json({success:false,message:"Not found"});
-  if(ap.sellerId.toString()!==req.user.userId)
-   return res.status(403).json({success:false,message:"Forbidden"});
+exports.updateStatus = async (req, res) => {
+    try {
+        // Populate buyer to send status update email
+        const ap = await Appointment.findById(req.params.id)
+            .populate("buyerId", "name email")
+            .populate("postId", "title");
 
-  ap.status=req.body.status;
-  await ap.save();
-  res.json({success:true,data:ap});
- }catch(e){res.status(500).json({success:false,message:e.message});}
+        if (!ap) return res.status(404).json({ success: false, message: "Not found" });
+        if (ap.sellerId.toString() !== req.user.userId)
+            return res.status(403).json({ success: false, message: "Forbidden" });
+
+        ap.status = req.body.status;
+        await ap.save();
+
+        // Send Email to Buyer
+        if (ap.buyerId && ap.buyerId.email) {
+            emailService.sendAppointmentStatusUpdate(ap.buyerId.email, ap.buyerId.name, ap.postId.title, ap.status, ap.appointmentTime);
+        }
+
+        res.json({ success: true, data: ap });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
-exports.myAppointments=async(req,res)=>{
- const list=await Appointment.find({buyerId:req.user.userId})
-  .populate("postId","title");
- res.json({success:true,data:list});
+exports.myAppointments = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        const buy = await Appointment.find({ buyerId: userId })
+            .populate("postId", "title images price address")
+            .populate("sellerId", "name phone avatar")
+            .sort({ createdAt: -1 });
+
+        const sell = await Appointment.find({ sellerId: userId })
+            .populate("postId", "title images price address")
+            .populate("buyerId", "name phone avatar")
+            .sort({ createdAt: -1 });
+
+        res.json({ success: true, data: { buy, sell } });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+};
+exports.deleteAppointment = async (req, res) => {
+    try {
+        const ap = await Appointment.findById(req.params.id);
+        if (!ap) return res.status(404).json({ success: false, message: "Appointment not found" });
+
+        // Allow deletion if user is either buyer or seller
+        if (ap.buyerId.toString() !== req.user.userId && ap.sellerId.toString() !== req.user.userId) {
+            return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+
+        await Appointment.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: "Deleted successfully" });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
 };
