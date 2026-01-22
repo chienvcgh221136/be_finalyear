@@ -4,9 +4,14 @@ const { Wallet, Transaction } = require("../models/WalletModel");
 
 exports.createPackage = async (req, res) => {
     try {
-        const { name, price, durationDays, priorityScore, description, perks, limitViewPhone } = req.body;
+        const { name, price, durationDays, priorityScore, description, perks, limitViewPhone, isPopular } = req.body;
+
+        if (isPopular) {
+            await VipPackage.updateMany({}, { isPopular: false });
+        }
+
         const newPackage = await VipPackage.create({
-            name, price, durationDays, priorityScore, description, perks, limitViewPhone: limitViewPhone || 0
+            name, price, durationDays, priorityScore, description, perks, limitViewPhone: limitViewPhone || 0, isPopular: isPopular || false
         });
         res.status(201).json({ success: true, data: newPackage });
     } catch (err) {
@@ -17,13 +22,18 @@ exports.createPackage = async (req, res) => {
 exports.updatePackage = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log(`Updating package ${id} with data:`, req.body);
+        console.log(`Updating package ${id}. Body:`, JSON.stringify(req.body, null, 2));
 
         const { name, price, durationDays, priorityScore, description, perks, limitViewPhone, isActive } = req.body;
+        const isPopular = req.body.isPopular === true || req.body.isPopular === 'true';
+
+        if (isPopular) {
+            await VipPackage.updateMany({ _id: { $ne: id } }, { isPopular: false });
+        }
 
         // Construct update object to ensure only valid fields are updated
         const updateData = {
-            name, price, durationDays, priorityScore, description, perks, limitViewPhone, isActive
+            name, price, durationDays, priorityScore, description, perks, limitViewPhone, isActive, isPopular
         };
 
         const updatedPackage = await VipPackage.findByIdAndUpdate(id, updateData, {

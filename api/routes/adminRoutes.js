@@ -17,4 +17,11 @@ router.patch(
     adminController.unbanUser
 );
 
+router.delete(
+    "/users/:userId",
+    auth,
+    role(["ADMIN"]),
+    adminController.deleteUser
+);
+
 module.exports = router;

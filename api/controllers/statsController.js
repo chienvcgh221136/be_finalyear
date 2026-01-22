@@ -68,3 +68,27 @@ exports.getAdminRevenue = async (req, res) => {
     // Basic implementation placeholder
     res.json({ message: "Not implemented yet" });
 };
+
+exports.getAdminPostStats = async (req, res) => {
+    try {
+        const pendingCount = await Post.countDocuments({ status: 'PENDING' });
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const approvedToday = await Post.countDocuments({
+            status: 'ACTIVE',
+            approvedAt: { $gte: startOfDay }
+        });
+
+        const rejectedCount = await Post.countDocuments({ status: 'REJECTED' });
+
+        res.json({
+            pending: pendingCount,
+            approvedToday,
+            rejected: rejectedCount
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};

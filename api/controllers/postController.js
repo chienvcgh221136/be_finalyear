@@ -131,6 +131,7 @@ exports.approvePost = async (req, res) => {
         if (!post) return res.status(404).json({ message: "Post not found" });
         post.status = "ACTIVE";
         post.rejectReason = null;
+        post.approvedAt = new Date();
         await post.save();
         res.json({ success: true, message: "Post approved" });
     } catch (err) {

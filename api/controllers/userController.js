@@ -25,7 +25,7 @@ exports.getUserById = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: "USER" }).select("-passwordHash");
+    const users = await User.find().select("-passwordHash");
 
     res.json({
       success: true,
