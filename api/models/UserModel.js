@@ -26,7 +26,9 @@ const UserSchema = new mongoose.Schema(
     },
     wallet: {
       balance: { type: Number, default: 0 },
-    }
+    },
+    withdrawalOTP: { type: String, select: false },
+    otpExpires: { type: Date, select: false }
   },
 
   {

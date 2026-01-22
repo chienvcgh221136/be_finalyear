@@ -16,9 +16,12 @@ const reportRoutes = require("./api/routes/reportRoutes");
 const uploadRoutes = require("./api/routes/uploadRoutes");
 const walletRoutes = require("./api/routes/walletRoutes");
 const vipRoutes = require("./api/routes/vipRoutes");
+const withdrawRoutes = require("./api/routes/withdrawRoutes");
 const statsRoutes = require("./api/routes/statsRoutes");
 const path = require("path");
 const chatRoutes = require("./api/routes/chatRoutes");
+require("./api/cron/withdrawCron"); // Start Cron Jobs
+require("./api/cron/vipCron");
 
 const cookieParser = require("cookie-parser");
 
@@ -48,6 +51,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/vip", vipRoutes);
+app.use("/api/withdraw", withdrawRoutes);
 app.use("/api/stats", statsRoutes);
 
 
