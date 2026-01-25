@@ -6,6 +6,8 @@ const checkAuth = require('../middlewares/authMiddleware');
 router.get('/packages', vipController.getPackages); // Public? Or auth? Public is better to see pricing
 router.post('/purchase', checkAuth, vipController.purchaseVip);
 router.get('/me', checkAuth, vipController.getMyVip);
+router.post('/attach', checkAuth, vipController.attachVip);
+router.post('/detach', checkAuth, vipController.detachVip);
 
 // Admin Routes
 const checkRole = require('../middlewares/roleMiddleware');
@@ -15,5 +17,6 @@ router.put('/packages/:id', checkAuth, checkRole(['ADMIN']), vipController.updat
 router.patch('/packages/:id', checkAuth, checkRole(['ADMIN']), vipController.deletePackage); // Soft delete using PATCH
 router.get('/admin/stats', checkAuth, checkRole(['ADMIN']), vipController.getAdminStats);
 router.get('/admin/users', checkAuth, checkRole(['ADMIN']), vipController.getVipUsers);
+router.put('/admin/users/:userId', checkAuth, checkRole(['ADMIN']), vipController.updateUserVip);
 
 module.exports = router;

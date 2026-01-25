@@ -71,13 +71,41 @@ exports.showPhone = async (req, res) => {
             });
         }
 
-        // Trả số điện thoại người bán
+        // 4. Calculate updated daily usage to return
+        // Count today's usage again to be sure (including the one just created if any)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const todayViewedPhones = await Lead.countDocuments({
+            buyerId: userId,
+            type: "SHOW_PHONE",
+            createdAt: { $gte: startOfDay }
+        });
+
+        // Get limit again or pass from above
+        let limit = 0;
+        const viewer = await User.findById(userId).populate('vip.packageId');
+
+        if (viewer.vip?.isActive) {
+            limit = viewer.vip.packageId?.limitViewPhone || 0;
+            // Fallback
+            if (limit === 0 && viewer.vip.vipType) {
+                const pkg = await VipPackage.findOne({ name: viewer.vip.vipType });
+                if (pkg) limit = pkg.limitViewPhone || 0;
+            }
+        }
+
+        // Trả số điện thoại người bán + usage info
         res.json({
             success: true,
             seller: {
                 id: post.userId._id,
                 name: post.userId.name,
                 phone: post.userId.phone
+            },
+            usage: {
+                today: todayViewedPhones,
+                limit: limit
             }
         });
 

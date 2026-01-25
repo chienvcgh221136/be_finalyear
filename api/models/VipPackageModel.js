@@ -7,6 +7,7 @@ const VipPackageSchema = new mongoose.Schema({
     priorityScore: { type: Number, required: true },
     description: { type: String },
     perks: [{ type: String }],
+    postLimit: { type: Number, default: 5 }, // Daily limit for VIP posts
     limitViewPhone: { type: Number, default: 0 }, // Daily limit for viewing phone numbers
     isActive: { type: Boolean, default: true },
     isPopular: { type: Boolean, default: false }

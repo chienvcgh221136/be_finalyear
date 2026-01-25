@@ -32,7 +32,7 @@ const PostSchema = new mongoose.Schema({
 
     images: [String],
     redbookImages: [String],
-    status: { type: String, enum: ["PENDING", "ACTIVE", "REJECTED", "SOLD"], default: "PENDING" },
+    status: { type: String, enum: ["PENDING", "ACTIVE", "REJECTED", "SOLD", "RENTED"], default: "PENDING" },
 
     rejectReason: { type: String, default: null },
     approvedAt: { type: Date, default: null },

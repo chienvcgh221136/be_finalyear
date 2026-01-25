@@ -11,6 +11,7 @@ router.post("/", auth, postController.createPost);
 router.put("/:id", auth, postController.updatePost);
 router.delete("/:id", auth, postController.deletePost);
 router.patch("/:id/sold", auth, postController.markSold);
+router.patch("/:id/rented", auth, postController.markRented);
 
 router.get("/admin/pending", auth, role("ADMIN"), async (req, res) => {
     const posts = await require("../models/PostModel").find({ status: "PENDING" }).populate('userId', 'name email avatar phone');

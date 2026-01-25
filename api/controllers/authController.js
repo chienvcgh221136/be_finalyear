@@ -160,9 +160,7 @@ exports.refreshToken = async (req, res) => {
 exports.logout = async (req, res) => {
     const refreshToken = req.cookies.refreshToken;
     if (refreshToken) {
-        // Optional: clear from DB if you maintain a whitelist/blacklist or strict single assignment
-        // await User.findOneAndUpdate({ refreshToken }, { refreshToken: null });
-        // But simply clearing the cookie is often enough for stateless JWT logout on client side
+        // Optional: clear from DB if needed
     }
 
     res.clearCookie('accessToken');

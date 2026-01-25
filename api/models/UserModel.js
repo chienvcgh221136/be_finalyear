@@ -23,6 +23,8 @@ const UserSchema = new mongoose.Schema(
       priorityScore: { type: Number, default: 0 },
       startedAt: { type: Date, default: null },
       expiredAt: { type: Date, default: null },
+      dailyUsedSlots: { type: Number, default: 0 },
+      currentVipPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Post" }]
     },
     wallet: {
       balance: { type: Number, default: 0 },
