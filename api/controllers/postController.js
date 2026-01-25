@@ -117,9 +117,32 @@ exports.markSold = async (req, res) => {
         if (!post) return res.status(404).json({ message: "Post not found" });
         if (post.userId.toString() !== req.user.userId)
             return res.status(403).json({ message: "Forbidden" });
+
         post.status = "SOLD";
         await post.save();
         res.json({ success: true, message: "Post marked as SOLD" });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
+exports.markRented = async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) return res.status(404).json({ message: "Post not found" });
+        if (post.userId.toString() !== req.user.userId)
+            return res.status(403).json({ message: "Forbidden" });
+
+        // Toggle status: if already RENTED, set back to ACTIVE. Else set to RENTED.
+        if (post.status === "RENTED") {
+            post.status = "ACTIVE";
+            await post.save();
+            return res.json({ success: true, message: "Post marked as AVAILABLE (ACTIVE)" });
+        } else {
+            post.status = "RENTED";
+            await post.save();
+            return res.json({ success: true, message: "Post marked as RENTED" });
+        }
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
     }
