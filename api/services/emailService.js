@@ -219,3 +219,54 @@ exports.sendAppointmentStatusUpdate = async (to, userName, postTitle, status, ti
         return false;
     }
 };
+
+exports.sendViolationWarning = async (to, userName, postTitle, reason, description) => {
+    try {
+        if (!to) return;
+
+        let reasonText = reason;
+        const reasons = {
+            'WRONG_INFO': 'Thông tin sai lệch',
+            'SCAM': 'Lừa đảo',
+            'DUPLICATE': 'Tin trùng lặp',
+            'SPAM': 'Spam',
+            'OTHER': 'Khác'
+        };
+        if (reasons[reason]) reasonText = reasons[reason];
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"NhaTot System" <system@nhatot.com>',
+            to: to,
+            subject: '⚠️ Cảnh báo vi phạm quy định đăng tin',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                    <div style="background-color: #ef4444; padding: 20px; text-align: center;">
+                        <h2 style="color: white; margin: 0;">Cảnh báo vi phạm</h2>
+                    </div>
+                    <div style="padding: 20px;">
+                        <p>Xin chào <strong>${userName}</strong>,</p>
+                        <p>Bài đăng của bạn: <strong>${postTitle}</strong> đã bị báo cáo và xác nhận vi phạm quy định của NhaTot.</p>
+                        
+                        <div style="background-color: #fff1f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>Lý do:</strong> ${reasonText}</p>
+                            ${description ? `<p style="margin: 5px 0;"><strong>Chi tiết:</strong> ${description}</p>` : ''}
+                        </div>
+
+                        <p>Vui lòng <strong>chỉnh sửa bài đăng</strong> để tuân thủ quy định ngay lập tức. Nếu tiếp tục vi phạm, tài khoản của bạn có thể bị khóa.</p>
+                        
+                        <div style="text-align: center; margin-top: 25px;">
+                            <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/profile?tab=posts" style="display: inline-block; background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Quản lý bài đăng</a>
+                        </div>
+                    </div>
+                    <div style="background-color: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="color: #6b7280; font-size: 12px; margin: 0;">Đội ngũ kiểm duyệt NhaTot</p>
+                    </div>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending violation warning email:", error);
+        return false;
+    }
+};

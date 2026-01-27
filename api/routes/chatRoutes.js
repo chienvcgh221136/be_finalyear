@@ -12,6 +12,7 @@ router.get("/search", chatController.searchMessages); // Added search route
 router.get("/:chatRoomId/messages", chatController.getMessages);
 router.post("/:chatRoomId/send", chatController.sendMessage);
 router.put("/:chatRoomId/read", chatController.markAsRead);
+router.put("/:chatRoomId/nickname", chatController.setNickname);
 router.delete("/:chatRoomId", chatController.deleteChat);
 
 module.exports = router;
