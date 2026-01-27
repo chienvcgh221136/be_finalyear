@@ -16,7 +16,8 @@ const WithdrawRequestSchema = new mongoose.Schema({
     escalationLevel: { type: Number, default: 0 }, // 0: None, 1: 2h Reminder, 2: 24h Urgent
     adminNote: { type: String, default: "" },
     requestedAt: { type: Date, default: Date.now },
-    processedAt: { type: Date }
+    approvedAt: { type: Date }, // Time when admin moves to APPROVED
+    processedAt: { type: Date } // Time of last status change (or PAID)
 }, { timestamps: true });
 
 module.exports = mongoose.model("WithdrawRequest", WithdrawRequestSchema);

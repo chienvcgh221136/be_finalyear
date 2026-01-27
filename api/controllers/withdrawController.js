@@ -112,6 +112,48 @@ exports.verifyWithdraw = async (req, res) => {
     }
 };
 
+exports.getWithdrawStats = async (req, res) => {
+    try {
+        const aggregation = await WithdrawRequest.aggregate([
+            {
+                $match: {
+                    status: "PAID",
+                    approvedAt: { $exists: true, $ne: null },
+                    processedAt: { $exists: true, $ne: null }
+                }
+            },
+            {
+                $project: {
+                    duration: { $subtract: ["$processedAt", "$approvedAt"] }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    avgDuration: { $avg: "$duration" },
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const stats = aggregation.length > 0 ? aggregation[0] : { avgDuration: 0, count: 0 };
+
+        const hours = Math.floor(stats.avgDuration / (1000 * 60 * 60));
+        const minutes = Math.floor((stats.avgDuration % (1000 * 60 * 60)) / (1000 * 60));
+
+        res.json({
+            success: true,
+            data: {
+                avgDurationMs: stats.avgDuration,
+                formatted: `${hours}h ${minutes}m`,
+                sampleSize: stats.count
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // Admin: Get Requests
 exports.getWithdrawRequests = async (req, res) => {
     try {
@@ -147,6 +189,10 @@ exports.updateWithdrawStatus = async (req, res) => {
         // Or simpler: PENDING -> APPROVED -> PAID or PENDING -> REJECTED.
 
         const oldStatus = request.status;
+        if (status === "APPROVED" && oldStatus !== "APPROVED") {
+            request.approvedAt = new Date();
+        }
+
         request.status = status;
         request.adminNote = adminNote || "";
         request.processedAt = new Date(); // Update processed time on change

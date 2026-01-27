@@ -17,6 +17,11 @@ const ChatRoomSchema = new mongoose.Schema({
     lastMessageAt: {
         type: Date,
         default: Date.now
+    },
+    nicknames: {
+        type: Map,
+        of: String,
+        default: {}
     }
 }, { timestamps: true, collection: "chat_rooms" });
 

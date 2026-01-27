@@ -258,3 +258,39 @@ exports.deleteChat = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// Set Nickname
+exports.setNickname = async (req, res) => {
+    try {
+        const { chatRoomId } = req.params;
+        const { targetUserId, nickname } = req.body;
+        const requesterId = req.user.userId;
+
+        const chatRoom = await ChatRoom.findOne({
+            _id: chatRoomId,
+            userIds: requesterId
+        });
+
+        if (!chatRoom) {
+            return res.status(404).json({ success: false, message: "Chat room not found or you are not a participant" });
+        }
+
+        // Initialize nicknames map if it doesn't exist
+        if (!chatRoom.nicknames) {
+            chatRoom.nicknames = new Map();
+        }
+
+        if (nickname && nickname.trim()) {
+            chatRoom.nicknames.set(targetUserId, nickname.trim());
+        } else {
+            chatRoom.nicknames.delete(targetUserId);
+        }
+
+        await chatRoom.save();
+
+        res.json({ success: true, message: "Nickname updated", nicknames: chatRoom.nicknames });
+    } catch (error) {
+        console.error("Set nickname error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
