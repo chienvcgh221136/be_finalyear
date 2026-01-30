@@ -270,3 +270,57 @@ exports.sendViolationWarning = async (to, userName, postTitle, reason, descripti
         return false;
     }
 };
+
+exports.sendAppointmentReminderSeller = async (to, sellerName, buyerName, postTitle, time, appointmentId) => {
+    try {
+        if (!to) return;
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"NhaTot System" <system@nhatot.com>',
+            to: to,
+            subject: '⏰ Nhắc nhở: Bạn có lịch hẹn chưa xử lý',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #f59e0b;">Nhắc nhở lịch hẹn!</h2>
+                    <p>Xin chào <strong>${sellerName}</strong>,</p>
+                    <p>Bạn có một yêu cầu xem nhà từ <strong>${buyerName}</strong> cho tin: <strong>${postTitle}</strong> chưa được xử lý.</p>
+                    <div style="background-color: #fffbeb; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #fcd34d;">
+                        <p style="margin: 5px 0;"><strong>Thời gian:</strong> ${new Date(time).toLocaleString('vi-VN')}</p>
+                        <p style="margin: 5px 0; font-size: 13px; color: #b45309;">Yêu cầu này đã được gửi hơn 24 giờ trước.</p>
+                    </div>
+                    <p>Vui lòng phản hồi sớm để tránh làm mất thời gian của khách hàng.</p>
+                    <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/profile?tab=appointments" style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xử lý ngay</a>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending reminder seller:", error);
+        return false;
+    }
+};
+
+exports.sendAppointmentReminderBuyer = async (to, buyerName, sellerName, postTitle, time) => {
+    try {
+        if (!to) return;
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"NhaTot Support" <support@nhatot.com>',
+            to: to,
+            subject: '⏳ Chúng tôi đã nhắc người bán về lịch hẹn của bạn',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #3b82f6;">Đang chờ phản hồi...</h2>
+                    <p>Xin chào <strong>${buyerName}</strong>,</p>
+                    <p>Yêu cầu xem nhà của bạn cho tin <strong>${postTitle}</strong> (lúc ${new Date(time).toLocaleString('vi-VN')}) vẫn đang chờ <strong>${sellerName}</strong> xác nhận.</p>
+                    <p>Chúng tôi vừa gửi email nhắc nhở người bán để họ xử lý sớm yêu cầu của bạn.</p>
+                    <p>Cảm ơn bạn đã kiên nhẫn.</p>
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    <p style="color: #6b7280; font-size: 12px;">Đội ngũ NhaTot</p>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending reminder buyer:", error);
+        return false;
+    }
+};

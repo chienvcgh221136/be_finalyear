@@ -63,6 +63,11 @@ exports.getMyPosts = async (req, res) => {
     }
 };
 
+
+// Simple in-memory cache to prevent view spamming (resets on server restart)
+// Key: "IP-PostID", Value: Timestamp
+const viewCache = new Map();
+
 exports.getPostById = async (req, res) => {
     try {
         const post = await Post.findById(req.params.id).populate("userId", "name phone rating");
@@ -74,10 +79,29 @@ exports.getPostById = async (req, res) => {
         const isAdmin = req.user && req.user.role === 'ADMIN';
 
         if (isPublic || isOwner || isAdmin) {
+
+            // Increment view count logic with debounce (1 minute)
+            if (!isOwner) {
+                const viewerIp = req.ip || req.connection.remoteAddress;
+                const viewKey = `${viewerIp}-${post._id}`;
+
+                if (!viewCache.has(viewKey)) {
+                    console.log(`[VIEW_COUNT] Incrementing for post ${post._id} by ${viewerIp}`);
+                    await Post.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } });
+
+                    // Set cache
+                    viewCache.set(viewKey, Date.now());
+
+                    // Auto expiry after 60 seconds
+                    setTimeout(() => viewCache.delete(viewKey), 60000);
+                } else {
+                    // console.log(`[VIEW_COUNT] Debounced view for post ${post._id} by ${viewerIp}`);
+                }
+            }
+
             return res.json({ success: true, data: post });
         }
 
-        // If not public and not authorized, return 404 to hide it
         return res.status(404).json({ message: "Post not found or restricted" });
 
     } catch (err) {

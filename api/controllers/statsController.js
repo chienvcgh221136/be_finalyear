@@ -19,11 +19,11 @@ exports.getMyStats = async (req, res) => {
         const vipPosts = posts.filter(p => p.vip && p.vip.isActive).length;
         const totalViews = posts.reduce((sum, p) => sum + (p.viewCount || 0), 0);
 
-        // Leads - currently just dummy or based on chat count? 
-        // We don't have explicit leads tracking yet, will output 0 or random for now/mock
-        // Or if we have ChatRooms, we could count strict 'leads'.
-        // For now, let's keep it simple.
-        const totalLeads = 0;
+        // Leads - Count how many times this user's phone was viewed
+        const totalLeads = await require("../models/LeadModel").countDocuments({
+            sellerId: userId,
+            type: "SHOW_PHONE"
+        });
 
         res.json({
             totalPosts,
