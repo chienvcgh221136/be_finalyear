@@ -79,8 +79,8 @@ cron.schedule('0 0 * * *', async () => {
     }
 });
 
-// 4.3 Backup Expiration Check (Every 30 mins)
-cron.schedule('*/30 * * * *', async () => {
+// 4.3 Backup Expiration Check (Every 1 minute)
+cron.schedule('* * * * *', async () => {
     try {
         const now = new Date();
         const expiredUsers = await User.find({
@@ -88,11 +88,18 @@ cron.schedule('*/30 * * * *', async () => {
             "vip.expiredAt": { $lt: now }
         });
 
+        if (expiredUsers.length > 0) {
+            console.log(`[CRON] Found ${expiredUsers.length} expired VIP users.`);
+        }
+
         for (const user of expiredUsers) {
             user.vip.isActive = false;
+            user.vip.vipType = "NONE";
+            user.vip.priorityScore = 0;
+            user.vip.packageId = null;
 
             // Force detach any remaining VIP posts
-            if (user.vip.currentVipPosts.length > 0) {
+            if (user.vip.currentVipPosts && user.vip.currentVipPosts.length > 0) {
                 await Post.updateMany(
                     { _id: { $in: user.vip.currentVipPosts } },
                     { $set: { "vip.isActive": false, "vip.priorityScore": 0 } }
@@ -101,7 +108,7 @@ cron.schedule('*/30 * * * *', async () => {
             }
 
             await user.save();
-            console.log(`[CRON] Expired Check: Deactivated user ${user._id}`);
+            console.log(`[CRON] Expired Check: Disabled VIP for user ${user.name} (${user._id})`);
         }
     } catch (err) {
         console.error("[CRON] Expiration Check Error:", err);
