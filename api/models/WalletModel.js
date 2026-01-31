@@ -10,7 +10,11 @@ const WalletSchema = new mongoose.Schema({
 
 const TransactionSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    type: { type: String, enum: ["TOPUP", "VIP_PURCHASE", "POST_FEE", "WITHDRAW", "REFUND"], required: true },
+    type: {
+        type: String,
+        enum: ['TOPUP', 'VIP_PURCHASE', 'POST_FEE', 'REFUND', 'WITHDRAW', 'VIP_UPGRADE'],
+        required: true
+    },
     amount: { type: Number, required: true },
     balanceAfter: { type: Number, required: true },
     refId: { type: mongoose.Schema.Types.ObjectId }, // Can be vipId or postId

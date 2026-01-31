@@ -3,11 +3,16 @@ const router = express.Router();
 const vipController = require('../controllers/vipController');
 const checkAuth = require('../middlewares/authMiddleware');
 
+
 router.get('/packages', vipController.getPackages); // Public? Or auth? Public is better to see pricing
 router.post('/purchase', checkAuth, vipController.purchaseVip);
 router.get('/me', checkAuth, vipController.getMyVip);
 router.post('/attach', checkAuth, vipController.attachVip);
 router.post('/detach', checkAuth, vipController.detachVip);
+// Upgrade Routes
+router.get('/upgrade', checkAuth, vipController.getUpgradeInfo);
+router.post('/upgrade', checkAuth, vipController.upgradeVip);
+
 
 // Admin Routes
 const checkRole = require('../middlewares/roleMiddleware');

@@ -50,7 +50,14 @@ exports.createReport = async (req, res) => {
 
 exports.getAllReports = async (req, res) => {
   const reports = await Report.find()
-    .populate("postId", "title")
+    .populate({
+      path: "postId",
+      select: "title userId",
+      populate: {
+        path: "userId",
+        select: "name email violationCount isBanned"
+      }
+    })
     .populate("reporterId", "name email")
     .sort({ createdAt: -1 });
 
@@ -70,6 +77,11 @@ exports.resolveReport = async (req, res) => {
 
     if (report && report.postId && report.postId.userId) {
       const owner = report.postId.userId;
+
+      // Increment violation count
+      owner.violationCount = (owner.violationCount || 0) + 1;
+      await owner.save();
+
       const emailService = require("../services/emailService");
 
       // Send Warning Email
@@ -96,3 +108,13 @@ exports.rejectReport = async (req, res) => {
   );
   res.json({ success: true, data: report });
 };
+
+exports.deleteReport = async (req, res) => {
+  try {
+    await Report.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: "Report deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
