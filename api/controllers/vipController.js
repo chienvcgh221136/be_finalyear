@@ -19,6 +19,168 @@ exports.createPackage = async (req, res) => {
     }
 };
 
+// =======================
+// VIP UPGRADE LOGIC
+// =======================
+
+exports.getUpgradeInfo = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const user = await User.findById(userId).populate("vip.packageId");
+
+        if (!user.vip.isActive || !user.vip.packageId) {
+            return res.status(400).json({ message: "You don't have an active VIP package to upgrade." });
+        }
+
+        const currentPackage = user.vip.packageId;
+        const now = new Date();
+        const expiredAt = new Date(user.vip.expiredAt);
+        const remainingTime = expiredAt - now;
+        const remainingDays = Math.max(0, remainingTime / (1000 * 60 * 60 * 24)); // Fractional days
+
+        if (remainingDays < 1) {
+            return res.status(400).json({ message: "Remaining time is less than 1 day. Cannot upgrade." });
+        }
+
+        // Calculate Residual Value of Current Package
+        // Formula: (Price / 30) * remainingDays
+        // We assume '30' is the standard divisor from the user spec, or we can use durationDays.
+        // User spec says: (Giá gói cũ ÷ 30 ngày) * Số ngày còn lại.
+        // Let's use 30 as per spec, or Math.max(currentPackage.durationDays, 1) if we want to be data-driven.
+        // Given spec example: BASIC $99/30 days. So divisior is durationDays.
+        const durationDivisor = currentPackage.durationDays || 30;
+
+        const dailyValue = currentPackage.price / durationDivisor;
+        const residualValue = Math.floor(dailyValue * remainingDays);
+
+        // Find Higher Tier Packages (Higher Price)
+        const upgradablePackages = await VipPackage.find({
+            isActive: true,
+            price: { $gt: currentPackage.price }
+        }).sort({ price: 1 });
+
+        const upgradeOptions = upgradablePackages.map(pkg => {
+            const upgradeCost = Math.max(0, pkg.price - residualValue);
+            return {
+                packageId: pkg._id,
+                name: pkg.name,
+                price: pkg.price,
+                description: pkg.description,
+                upgradeCost: Math.ceil(upgradeCost), // Ensure integer
+                residualValue: residualValue,
+                originalPrice: pkg.price,
+                priorityScore: pkg.priorityScore,
+                perks: pkg.perks
+            };
+        });
+
+        res.json({
+            success: true,
+            data: {
+                currentPackage: {
+                    name: currentPackage.name,
+                    price: currentPackage.price,
+                    remainingDays: remainingDays, // Keep precision for UI if needed or round
+                    residualValue: residualValue,
+                    expiredAt: user.vip.expiredAt
+                },
+                upgradeOptions
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.upgradeVip = async (req, res) => {
+    try {
+        const { targetPackageId } = req.body;
+        const userId = req.user.userId;
+
+        const user = await User.findById(userId).populate("vip.packageId");
+        if (!user.vip.isActive || !user.vip.packageId) {
+            return res.status(400).json({ message: "No active VIP to upgrade." });
+        }
+
+        const currentPackage = user.vip.packageId;
+        const targetPackage = await VipPackage.findById(targetPackageId);
+
+        if (!targetPackage) return res.status(404).json({ message: "Target package not found." });
+        if (targetPackage.price <= currentPackage.price) {
+            return res.status(400).json({ message: "Can only upgrade to a higher value package." });
+        }
+
+        const now = new Date();
+        const expiredAt = new Date(user.vip.expiredAt);
+        const remainingTime = expiredAt - now;
+        const remainingDays = Math.max(0, remainingTime / (1000 * 60 * 60 * 24));
+
+        if (remainingDays < 1) {
+            return res.status(400).json({ message: "Cannot upgrade if less than 1 day remaining." });
+        }
+
+        // Calculate Cost
+        const durationDivisor = currentPackage.durationDays || 30;
+        const dailyValue = currentPackage.price / durationDivisor;
+        const residualValue = Math.floor(dailyValue * remainingDays);
+        const upgradeCost = Math.max(0, Math.ceil(targetPackage.price - residualValue));
+
+        // Check Wallet
+        const wallet = await Wallet.findOne({ userId });
+        if (!wallet || wallet.balance < upgradeCost) {
+            return res.status(400).json({ message: "Insufficient balance." });
+        }
+
+        // --- EXECUTE TRANSACTION ---
+
+        // 1. Deduct Money
+        wallet.balance -= upgradeCost;
+        wallet.totalSpent += upgradeCost;
+        await wallet.save();
+
+        // 2. Transaction Record
+        await Transaction.create({
+            userId,
+            type: "VIP_UPGRADE",
+            amount: -upgradeCost,
+            balanceAfter: wallet.balance,
+            refId: targetPackage._id,
+            description: `Upgrade VIP: ${currentPackage.name} -> ${targetPackage.name}`
+        });
+
+        // 3. Update User VIP
+        // KEY REQUIREMENT: Keep expiredAt unchanged
+        user.vip.vipType = targetPackage.name;
+        user.vip.packageId = targetPackage._id;
+        user.vip.priorityScore = targetPackage.priorityScore;
+        // user.vip.dailyUsedSlots: assuming limit increases, but usage remains same.
+
+        await user.save();
+
+        // 4. Activating Instant Benefits -> Update Active Posts
+        const Post = require("../models/PostModel");
+        await Post.updateMany(
+            {
+                userId: userId,
+                "vip.isActive": true,
+                status: "ACTIVE"
+            },
+            {
+                $set: {
+                    "vip.vipType": targetPackage.name,
+                    "vip.priorityScore": targetPackage.priorityScore
+                }
+            }
+        );
+
+        res.json({ success: true, message: "Upgrade successful", data: user.vip });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 exports.updatePackage = async (req, res) => {
     try {
         const { id } = req.params;

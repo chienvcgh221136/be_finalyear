@@ -54,6 +54,7 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/vip", vipRoutes);
 app.use("/api/withdraw", withdrawRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/comments", require("./api/routes/commentRoutes"));
 
 
 mongoose

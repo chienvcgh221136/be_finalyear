@@ -46,7 +46,7 @@ exports.getActivePosts = async (req, res) => {
         const posts = await Post.find(query)
             .sort({ 'vip.priorityScore': -1, createdAt: -1 })
             .limit(limitValue)
-            .populate('userId', 'name avatar');
+            .populate('userId', 'name avatar rating totalReviews');
 
         res.json({ success: true, count: posts.length, data: posts });
     } catch (err) {
@@ -70,7 +70,7 @@ const viewCache = new Map();
 
 exports.getPostById = async (req, res) => {
     try {
-        const post = await Post.findById(req.params.id).populate("userId", "name phone rating");
+        const post = await Post.findById(req.params.id).populate("userId", "name phone rating totalReviews avatar");
         if (!post) return res.status(404).json({ message: "Post not found" });
 
         // Access Control
@@ -126,7 +126,7 @@ exports.deletePost = async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
         if (!post) return res.status(404).json({ message: "Post not found" });
-        if (post.userId.toString() !== req.user.userId)
+        if (post.userId.toString() !== req.user.userId && req.user.role !== 'ADMIN')
             return res.status(403).json({ message: "Forbidden" });
         await post.deleteOne();
         res.json({ success: true, message: "Post deleted" });

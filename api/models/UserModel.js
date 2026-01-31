@@ -16,6 +16,7 @@ const UserSchema = new mongoose.Schema(
     rating: { type: Number, default: 0, min: 0, max: 5 },
     totalReviews: { type: Number, default: 0 },
     avatar: { type: String, default: "" },
+    violationCount: { type: Number, default: 0 },
     vip: {
       isActive: { type: Boolean, default: false },
       vipType: { type: String, default: "NONE" },
