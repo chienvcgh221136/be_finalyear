@@ -6,6 +6,7 @@ const role = require("../middlewares/roleMiddleware");
 
 router.get("/", postController.getActivePosts);
 router.get("/me/list", auth, postController.getMyPosts);
+router.get("/user/:userId/list", postController.getPostsByUser);
 router.get("/:id", auth, postController.getPostById);
 router.post("/", auth, postController.createPost);
 router.put("/:id", auth, postController.updatePost);

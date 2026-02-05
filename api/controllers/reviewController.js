@@ -32,6 +32,16 @@ exports.createReview = async (req, res) => {
         // Populate for immediate return
         await rv.populate("buyerId", "name avatar");
 
+        // Notify Seller
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: sellerId,
+            senderId: buyerId,
+            type: "REVIEW",
+            message: `${rv.buyerId.name} đã viết đánh giá cho bạn.`,
+            relatedId: rv._id
+        });
+
         res.json({ success: true, data: rv });
     } catch (e) {
         if (e.code === 11000)

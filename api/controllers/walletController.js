@@ -44,6 +44,16 @@ exports.topup = async (req, res) => {
             description: `Topup via ${method || 'BANK'}`
         });
 
+        // Notify User
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: req.user.userId,
+            senderId: null,
+            type: "SYSTEM",
+            message: `Nạp tiền thành công: +${amount.toLocaleString('vi-VN')}đ. Số dư hiện tại: ${wallet.balance.toLocaleString('vi-VN')}đ.`,
+            relatedId: wallet.userId // or transaction id if available in future, for now using userId or null
+        });
+
         res.json({ success: true, balance: wallet.balance });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -131,6 +141,16 @@ exports.sepayWebhook = async (req, res) => {
             emailService.sendTopupSuccessEmail(user.email, user.name, amount, wallet.balance)
                 .catch(err => console.error("Failed to send email:", err));
         }
+
+        // Notify User
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: userId,
+            senderId: null,
+            type: "SYSTEM",
+            message: `Nạp tiền thành công (Sepay): +${amount.toLocaleString('vi-VN')}đ. Số dư hiện tại: ${wallet.balance.toLocaleString('vi-VN')}đ.`,
+            relatedId: null
+        });
 
         return res.json({ success: true, message: "Topup Successful" });
 

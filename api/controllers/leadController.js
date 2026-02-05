@@ -69,6 +69,17 @@ exports.showPhone = async (req, res) => {
                 sellerId: post.userId._id,
                 type: "SHOW_PHONE"
             });
+
+            // Notify Seller
+            const NotificationController = require("./notificationController");
+            await NotificationController.createNotification({
+                recipientId: post.userId._id,
+                senderId: userId,
+                type: "LEAD",
+                message: `Người dùng ${currentUser.name} đã xem số điện thoại bài đăng "${post.title}".`,
+                relatedId: post._id
+            });
+
         }
 
         // 4. Calculate updated daily usage to return

@@ -176,6 +176,16 @@ exports.upgradeVip = async (req, res) => {
 
         res.json({ success: true, message: "Upgrade successful", data: user.vip });
 
+        // Notify User
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: userId,
+            senderId: null,
+            type: "SYSTEM",
+            message: `Nâng cấp gói VIP thành công: "${targetPackage.name}".`,
+            relatedId: targetPackage._id
+        });
+
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -289,6 +299,16 @@ exports.purchaseVip = async (req, res) => {
         });
 
         res.json({ success: true, message: "VIP Upgraded Successfully" });
+
+        // Notify User
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: userId,
+            senderId: null,
+            type: "SYSTEM",
+            message: `Đăng ký gói VIP "${pkg.name}" thành công! Thời hạn: ${pkg.durationDays} ngày.`,
+            relatedId: pkg._id
+        });
 
     } catch (err) {
         res.status(500).json({ message: err.message });
