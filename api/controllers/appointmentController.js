@@ -32,6 +32,16 @@ exports.createAppointment = async (req, res) => {
         // Send Email to Receiver (Seller)
         emailService.sendAppointmentRequestReceiver(post.userId.email, post.userId.name, buyer.name, post.title, appointmentTime, note);
 
+        // Notify Seller
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: post.userId._id,
+            senderId: req.user.userId,
+            type: "APPOINTMENT",
+            message: `${buyer.name} đã đặt lịch hẹn "${post.title}".`,
+            relatedId: ap._id
+        });
+
         res.json({ success: true, data: ap });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -54,6 +64,16 @@ exports.updateStatus = async (req, res) => {
         if (ap.buyerId && ap.buyerId.email) {
             emailService.sendAppointmentStatusUpdate(ap.buyerId.email, ap.buyerId.name, ap.postId.title, ap.status, ap.appointmentTime);
         }
+
+        // Notify Buyer
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: ap.buyerId._id,
+            senderId: req.user.userId, // Seller
+            type: "APPOINTMENT",
+            message: `Lịch hẹn "${ap.postId.title}" của bạn đã chuyển sang trạng thái: ${req.body.status}.`,
+            relatedId: ap._id
+        });
 
         res.json({ success: true, data: ap });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }

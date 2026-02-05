@@ -1,12 +1,12 @@
 const Post = require("../models/PostModel");
 const User = require("../models/UserModel");
+const ViewHistory = require("../models/ViewHistoryModel");
 
 exports.createPost = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId);
         let postData = { ...req.body, userId: req.user.userId };
 
-        // Apply VIP status if User is VIP and not expired
         if (user.vip && user.vip.isActive) {
             const now = new Date();
             if (!user.vip.expiredAt || new Date(user.vip.expiredAt) > now) {
@@ -15,12 +15,23 @@ exports.createPost = async (req, res) => {
                     vipType: user.vip.vipType,
                     priorityScore: user.vip.priorityScore || 0,
                     startedAt: now,
-                    expiredAt: user.vip.expiredAt // Or based on post duration? Usually inherits user VIP status during creation
+                    expiredAt: user.vip.expiredAt
                 };
             }
         }
 
         const post = await Post.create(postData);
+
+        // Notify User (Confirmation)
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: req.user.userId,
+            senderId: null, // System
+            type: "SYSTEM",
+            message: `Bài đăng "${post.title}" của bạn đã được tạo thành công và đang hiển thị.`,
+            relatedId: post._id
+        });
+
         res.status(201).json({ success: true, data: post });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -29,10 +40,8 @@ exports.createPost = async (req, res) => {
 
 exports.getActivePosts = async (req, res) => {
     try {
-        const { isVip, status, limit, transactionType, propertyType } = req.query;
+        const { isVip, status, limit, transactionType, propertyType, q, city } = req.query;
 
-        // SECURITY: Only allow ACTIVE or SOLD posts in public listing. 
-        // Ignore client 'status' if it tries to request PENDING/REJECTED.
         const safeStatus = (status === 'SOLD') ? 'SOLD' : 'ACTIVE';
 
         let query = { status: safeStatus };
@@ -41,14 +50,45 @@ exports.getActivePosts = async (req, res) => {
         if (transactionType) query.transactionType = transactionType;
         if (propertyType) query.propertyType = propertyType;
 
-        const limitValue = limit ? parseInt(limit) : 0;
+        if (city) {
+            // Using regex for partial match on city name (flexible for "Ho Chi Minh" vs "TP.HCM")
+            query['address.city'] = { $regex: city, $options: 'i' };
+        }
 
+        if (q) {
+            const searchRegex = { $regex: q, $options: 'i' };
+            // Scan multiple fields: Title, Desc, Address fields
+            query.$or = [
+                { title: searchRegex },
+                { description: searchRegex },
+                { 'address.street': searchRegex },
+                { 'address.ward': searchRegex },
+                { 'address.district': searchRegex },
+                { 'address.city': searchRegex }
+            ];
+        }
+
+        const pageValue = parseInt(req.query.page) || 1;
+        const limitValue = parseInt(limit) || 12; // Default 12 per page
+        const skip = (pageValue - 1) * limitValue;
+
+        const total = await Post.countDocuments(query);
         const posts = await Post.find(query)
             .sort({ 'vip.priorityScore': -1, createdAt: -1 })
+            .skip(skip)
             .limit(limitValue)
             .populate('userId', 'name avatar rating totalReviews');
 
-        res.json({ success: true, count: posts.length, data: posts });
+        res.json({
+            success: true,
+            data: posts,
+            pagination: {
+                total,
+                page: pageValue,
+                limit: limitValue,
+                totalPages: Math.ceil(total / limitValue)
+            }
+        });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -63,9 +103,21 @@ exports.getMyPosts = async (req, res) => {
     }
 };
 
+exports.getPostsByUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const posts = await Post.find({
+            userId: userId,
+            status: { $in: ['ACTIVE', 'SOLD', 'RENTED'] }
+        }).sort({ createdAt: -1 });
 
-// Simple in-memory cache to prevent view spamming (resets on server restart)
-// Key: "IP-PostID", Value: Timestamp
+        res.json({ success: true, count: posts.length, data: posts });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
 const viewCache = new Map();
 
 exports.getPostById = async (req, res) => {
@@ -89,15 +141,22 @@ exports.getPostById = async (req, res) => {
                     console.log(`[VIEW_COUNT] Incrementing for post ${post._id} by ${viewerIp}`);
                     await Post.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } });
 
+                    // Record detailed View History
+                    await ViewHistory.create({
+                        postId: post._id,
+                        viewerId: req.user ? req.user.userId : null,
+                        ip: viewerIp,
+                        userAgent: req.headers['user-agent']
+                    });
+
                     // Set cache
                     viewCache.set(viewKey, Date.now());
 
                     // Auto expiry after 60 seconds
                     setTimeout(() => viewCache.delete(viewKey), 60000);
-                } else {
-                    // console.log(`[VIEW_COUNT] Debounced view for post ${post._id} by ${viewerIp}`);
                 }
             }
+
 
             return res.json({ success: true, data: post });
         }
@@ -115,6 +174,13 @@ exports.updatePost = async (req, res) => {
         if (!post) return res.status(404).json({ message: "Post not found" });
         if (post.userId.toString() !== req.user.userId)
             return res.status(403).json({ message: "Forbidden" });
+
+        if (req.user.role !== 'ADMIN') {
+            req.body.status = "PENDING";
+            req.body.rejectReason = null;
+            req.body.approvedAt = null;
+        }
+
         const updated = await Post.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json({ success: true, data: updated });
     } catch (err) {
@@ -180,6 +246,17 @@ exports.approvePost = async (req, res) => {
         post.rejectReason = null;
         post.approvedAt = new Date();
         await post.save();
+
+        // Notify User
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: post.userId,
+            senderId: null, // System
+            type: "SYSTEM",
+            message: `Tin đăng "${post.title}" của bạn đã được duyệt và đang hiển thị công khai.`,
+            relatedId: post._id
+        });
+
         res.json({ success: true, message: "Post approved" });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -195,6 +272,17 @@ exports.rejectPost = async (req, res) => {
         post.status = "REJECTED";
         post.rejectReason = reason;
         await post.save();
+
+        // Notify User
+        const NotificationController = require("./notificationController");
+        await NotificationController.createNotification({
+            recipientId: post.userId,
+            senderId: null, // System
+            type: "SYSTEM",
+            message: `Tin đăng "${post.title}" của bạn đã bị từ chối. Lý do: ${reason}`,
+            relatedId: post._id
+        });
+
         res.json({ success: true, message: "Post rejected" });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });

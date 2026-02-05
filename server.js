@@ -12,6 +12,7 @@ const favoriteRoutes = require("./api/routes/favoriteRoutes");
 const reviewRoutes = require("./api/routes/reviewRoutes");
 const adminRoutes = require("./api/routes/adminRoutes");
 const reportRoutes = require("./api/routes/reportRoutes");
+const notificationRoutes = require("./api/routes/notificationRoutes");
 
 const uploadRoutes = require("./api/routes/uploadRoutes");
 const walletRoutes = require("./api/routes/walletRoutes");
@@ -46,6 +47,7 @@ app.use("/api/favorites", favoriteRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use("/api/chat", chatRoutes);

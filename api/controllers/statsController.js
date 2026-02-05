@@ -2,6 +2,9 @@ const Post = require("../models/PostModel");
 const User = require("../models/UserModel");
 const { Wallet } = require("../models/WalletModel");
 const VipPackage = require("../models/VipPackageModel");
+const ViewHistory = require("../models/ViewHistoryModel");
+const Lead = require("../models/LeadModel");
+const mongoose = require("mongoose");
 
 exports.getMyStats = async (req, res) => {
     try {
@@ -20,10 +23,68 @@ exports.getMyStats = async (req, res) => {
         const totalViews = posts.reduce((sum, p) => sum + (p.viewCount || 0), 0);
 
         // Leads - Count how many times this user's phone was viewed
-        const totalLeads = await require("../models/LeadModel").countDocuments({
+        const totalLeads = await Lead.countDocuments({
             sellerId: userId,
             type: "SHOW_PHONE"
         });
+
+        // --- CHART DATA AGGREGATION ---
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+
+        const userObjectId = new mongoose.Types.ObjectId(userId);
+        const postIds = posts.map(p => p._id);
+
+        const [viewsDaily, leadsDaily, postsDaily] = await Promise.all([
+            ViewHistory.aggregate([
+                { $match: { postId: { $in: postIds }, createdAt: { $gte: sevenDaysAgo } } },
+                {
+                    $group: {
+                        _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                        count: { $sum: 1 }
+                    }
+                }
+            ]),
+            Lead.aggregate([
+                { $match: { sellerId: userObjectId, createdAt: { $gte: sevenDaysAgo } } },
+                {
+                    $group: {
+                        _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                        count: { $sum: 1 }
+                    }
+                }
+            ]),
+            Post.aggregate([
+                { $match: { userId: userObjectId, createdAt: { $gte: sevenDaysAgo } } },
+                {
+                    $group: {
+                        _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                        count: { $sum: 1 }
+                    }
+                }
+            ])
+        ]);
+
+        // Format data for the last 7 days
+        const chartData = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateString = d.toISOString().split('T')[0];
+            const displayDate = `${d.getDate()}/${d.getMonth() + 1}`;
+
+            const viewCount = viewsDaily.find(item => item._id === dateString)?.count || 0;
+            const leadCount = leadsDaily.find(item => item._id === dateString)?.count || 0;
+            const postCount = postsDaily.find(item => item._id === dateString)?.count || 0;
+
+            chartData.unshift({
+                name: displayDate, // DD/MM
+                views: viewCount,
+                leads: leadCount,
+                posts: postCount
+            });
+        }
 
         res.json({
             totalPosts,
@@ -32,7 +93,8 @@ exports.getMyStats = async (req, res) => {
             totalViews,
             totalLeads,
             vipPosts,
-            totalSpent: wallet ? wallet.totalSpent : 0
+            totalSpent: wallet ? wallet.totalSpent : 0,
+            chartData
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -52,12 +114,19 @@ exports.getAdminOverview = async (req, res) => {
 
         const activeVipUsers = await User.countDocuments({ 'vip.isActive': true });
 
+        // Calculate total views across all posts
+        // Use aggregate for better performance on large datasets if needed, but reduce is fine for now or find().select
+        // Better: const result = await Post.aggregate([{ $group: { _id: null, total: { $sum: "$viewCount" } } }]);
+        const allPosts = await Post.find({}, "viewCount");
+        const totalViews = allPosts.reduce((sum, p) => sum + (p.viewCount || 0), 0);
+
         res.json({
             totalUsers,
             totalPosts,
             vipRevenue,
             topupRevenue: totalTopup,
-            activeVipUsers
+            activeVipUsers,
+            totalViews
         });
     } catch (err) {
         res.status(500).json({ message: err.message });

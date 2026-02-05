@@ -42,6 +42,34 @@ exports.createReport = async (req, res) => {
       description
     });
 
+    // --- Notifications ---
+    const NotificationController = require("./notificationController");
+    const User = require("../models/UserModel");
+
+    // 1. Notify Reporter (Confirmation)
+    await NotificationController.createNotification({
+      recipientId: req.user.userId,
+      senderId: null, // System
+      type: "SYSTEM", // or "REPORT_CONFIRMATION" if you want specific icon
+      message: `Chúng tôi đã nhận được báo cáo của bạn về bài đăng. Cảm ơn bạn đã đóng góp cho cộng đồng.`,
+      relatedId: postId
+    });
+
+    // 2. Notify Admins (New Report Alert)
+    const admins = await User.find({ role: "ADMIN" }, "_id");
+    if (admins.length > 0) {
+      const adminNotifications = admins.map(admin => ({
+        recipientId: admin._id,
+        senderId: req.user.userId,
+        type: "REPORT", // Special type key for Admin Dashboard
+        message: `Báo cáo mới từ người dùng về bài đăng (Lý do: ${reason}).`,
+        relatedId: postId,
+        isRead: false
+      }));
+      const Notification = require("../models/NotificationModel");
+      await Notification.insertMany(adminNotifications);
+    }
+
     res.json({ success: true, data: report });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -92,6 +120,16 @@ exports.resolveReport = async (req, res) => {
         report.reason,
         report.description
       );
+
+      // Notify User (In-App)
+      const NotificationController = require("./notificationController");
+      await NotificationController.createNotification({
+        recipientId: owner._id,
+        senderId: null, // System
+        type: "REPORT",
+        message: `Bài đăng "${report.postId.title}" của bạn đã bị báo cáo vi phạm: ${report.reason}. Vui lòng kiểm tra lại.`,
+        relatedId: report.postId._id
+      });
     }
 
     res.json({ success: true, data: report });
