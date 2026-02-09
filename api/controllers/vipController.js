@@ -186,6 +186,13 @@ exports.upgradeVip = async (req, res) => {
             relatedId: targetPackage._id
         });
 
+        // Add Loyalty Points for upgrade cost
+        const upgradePoints = Math.floor(upgradeCost / 1000);
+        if (upgradePoints > 0) {
+            const pointController = require("./pointController");
+            await pointController.addPoints(userId, "VIP_PURCHASE", upgradePoints, targetPackage._id);
+        }
+
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -256,6 +263,10 @@ exports.purchaseVip = async (req, res) => {
         const pkg = await VipPackage.findById(packageId);
         if (!pkg) return res.status(404).json({ message: "Package not found" });
 
+        // Retrieve User to modify (preserves existing fields)
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
         const wallet = await Wallet.findOne({ userId });
         if (!wallet) return res.status(400).json({ message: "Wallet not found" });
 
@@ -268,10 +279,9 @@ exports.purchaseVip = async (req, res) => {
         wallet.totalSpent += pkg.price;
         await wallet.save();
 
-        // Sync with User model
-        await User.findByIdAndUpdate(userId, {
-            'wallet.balance': wallet.balance
-        });
+        // Update user balances
+        user.wallet = user.wallet || {};
+        user.wallet.balance = wallet.balance;
 
         // Create transaction
         await Transaction.create({
@@ -283,20 +293,24 @@ exports.purchaseVip = async (req, res) => {
             description: `Purchase VIP: ${pkg.name}`
         });
 
-        // Update User VIP State
+        // Update User VIP State (Preserving bonus credits)
         const now = new Date();
         const expiredAt = new Date(now.getTime() + pkg.durationDays * 24 * 60 * 60 * 1000);
 
-        await User.findByIdAndUpdate(userId, {
-            vip: {
-                isActive: true,
-                vipType: pkg.name,
-                packageId: pkg._id,
-                priorityScore: pkg.priorityScore,
-                startedAt: now,
-                expiredAt: expiredAt
-            }
-        });
+        if (!user.vip) user.vip = {};
+
+        user.vip.isActive = true;
+        user.vip.vipType = pkg.name;
+        user.vip.packageId = pkg._id;
+        user.vip.priorityScore = pkg.priorityScore;
+        user.vip.startedAt = now;
+        user.vip.expiredAt = expiredAt;
+
+        // Ensure bonus fields exist if undefined
+        if (user.vip.bonusPushCredits === undefined) user.vip.bonusPushCredits = 0;
+        if (user.vip.bonusLeadCredits === undefined) user.vip.bonusLeadCredits = 0;
+
+        await user.save();
 
         res.json({ success: true, message: "VIP Upgraded Successfully" });
 
@@ -309,6 +323,13 @@ exports.purchaseVip = async (req, res) => {
             message: `Đăng ký gói VIP "${pkg.name}" thành công! Thời hạn: ${pkg.durationDays} ngày.`,
             relatedId: pkg._id
         });
+
+        // Add Loyalty Points (1 point per 1000 VND spent)
+        const pointsEarned = Math.floor(pkg.price / 1000);
+        const pointController = require("./pointController");
+        if (pointsEarned > 0) {
+            await pointController.addPoints(userId, "VIP_PURCHASE", pointsEarned, pkg._id);
+        }
 
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -368,14 +389,11 @@ exports.getAdminStats = async (req, res) => {
                     createdAt: { $gte: thirtyDaysAgo }
                 }
             },
-            { $group: { _id: null, total: { $sum: "$amount" } } } // amount is negative for purchases
+            { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
 
-        // Amount is stored as negative for spending, so we invert it. 
-        // Or if you store positive... let's check purchaseVip logic: amount: -pkg.price
         const monthlyRevenue = revenueAggregation.length > 0 ? Math.abs(revenueAggregation[0].total) : 0;
 
-        // Top Package
         const topPackageAggregation = await User.aggregate([
             { $match: { "vip.isActive": true } },
             { $group: { _id: "$vip.vipType", count: { $sum: 1 } } },
@@ -419,10 +437,7 @@ exports.updateUserVip = async (req, res) => {
 
         if (expiredAt) user.vip.expiredAt = new Date(expiredAt);
         if (typeof isActive === 'boolean') user.vip.isActive = isActive;
-        if (vipType) user.vip.vipType = vipType; // Optional: Allow changing package type name manually
-
-        // If deactivated, maybe clear current posts?
-        // keeping it simple for now: valid posts will auto-expire if expiredAt is past or isActive false.
+        if (vipType) user.vip.vipType = vipType;
 
         await user.save();
         res.json({ success: true, message: "User VIP updated successfully", data: user.vip });
@@ -440,23 +455,36 @@ exports.attachVip = async (req, res) => {
         }
 
         const user = await User.findById(userId).populate("vip.packageId");
-        if (!user.vip.isActive || !user.vip.packageId) {
-            return res.status(403).json({ message: "No active VIP subscription" });
+
+        // Logic to allow bonus credits usage even without active VIP
+        const hasBonus = (user.vip.bonusPushCredits || 0) > 0;
+        const isVipActive = user.vip.isActive && user.vip.packageId && (!user.vip.expiredAt || new Date(user.vip.expiredAt) >= new Date());
+
+        if (!isVipActive && !hasBonus) {
+            return res.status(403).json({ message: "No active VIP subscription or bonus credits" });
         }
 
-        const now = new Date();
-        if (user.vip.expiredAt && new Date(user.vip.expiredAt) < now) {
-            return res.status(403).json({ message: "VIP subscription expired" });
-        }
-
-        const limit = user.vip.packageId.postLimit || 0;
+        const limit = isVipActive ? (user.vip.packageId.postLimit || 0) : 0;
+        const bonus = user.vip.bonusPushCredits || 0;
         const currentUsed = user.vip.dailyUsedSlots || 0;
         const needed = postIds.length;
 
-        if (currentUsed + needed > limit) {
-            return res.status(400).json({
-                message: `Not enough daily slots. Used: ${currentUsed}/${limit}. Needed: ${needed}.`
-            });
+        // Calculate available slots logic
+        const remainingDaily = Math.max(0, limit - currentUsed);
+        let bonusToUse = 0;
+
+        if (needed > remainingDaily) {
+            const deficit = needed - remainingDaily;
+            if (deficit > bonus) {
+                return res.status(400).json({
+                    message: `Not enough slots. Available: ${remainingDaily} daily + ${bonus} bonus. Needed: ${needed}.`
+                });
+            }
+            bonusToUse = deficit;
+        }
+
+        if (bonusToUse > 0) {
+            user.vip.bonusPushCredits -= bonusToUse;
         }
 
         const Post = require("../models/PostModel");
@@ -528,8 +556,6 @@ exports.detachVip = async (req, res) => {
             }
         );
 
-        // Remove from currentVipPosts (but DO NOT decrement dailyUsedSlots)
-        // using toString for comparison safely
         const detachIds = postIds.map(id => id.toString());
         user.vip.currentVipPosts = user.vip.currentVipPosts.filter(
             id => !detachIds.includes(id.toString())

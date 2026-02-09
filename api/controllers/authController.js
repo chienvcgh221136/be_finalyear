@@ -105,6 +105,29 @@ exports.login = async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
+
+
+        // --- DAILY LOGIN POINTS ---
+        try {
+            const PointLog = require("../models/PointLogModel");
+            const pointController = require("./pointController");
+
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const hasLoginPoints = await PointLog.findOne({
+                userId: user._id,
+                action: "DAILY_LOGIN",
+                createdAt: { $gte: startOfDay }
+            });
+
+            if (!hasLoginPoints) {
+                await pointController.addPoints(user._id, "DAILY_LOGIN", 10);
+            }
+        } catch (pointErr) {
+            console.error("Daily login point error:", pointErr);
+        }
+
         res.json({
             success: true,
             user: {
@@ -236,6 +259,27 @@ exports.googleLogin = async (req, res) => {
             sameSite: 'strict',
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
+
+        // --- DAILY LOGIN POINTS ---
+        try {
+            const PointLog = require("../models/PointLogModel");
+            const pointController = require("./pointController");
+
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const hasLoginPoints = await PointLog.findOne({
+                userId: user._id,
+                action: "DAILY_LOGIN",
+                createdAt: { $gte: startOfDay }
+            });
+
+            if (!hasLoginPoints) {
+                await pointController.addPoints(user._id, "DAILY_LOGIN", 10);
+            }
+        } catch (pointErr) {
+            console.error("Daily login point error (Google):", pointErr);
+        }
 
         res.json({
             success: true,

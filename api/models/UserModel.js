@@ -26,11 +26,22 @@ const UserSchema = new mongoose.Schema(
       startedAt: { type: Date, default: null },
       expiredAt: { type: Date, default: null },
       dailyUsedSlots: { type: Number, default: 0 },
-      currentVipPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Post" }]
+      currentVipPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Post" }],
+      bonusPushCredits: { type: Number, default: 0 },  // Bonus push post credits from items
+      bonusLeadCredits: { type: Number, default: 0 }   // Bonus lead view credits from items
+    },
+    inventory: {
+      postPush: { type: Number, default: 0 },
+      vipBronze1Day: { type: Number, default: 0 },
+      vipSilver3Day: { type: Number, default: 0 },
+      vipGold7Day: { type: Number, default: 0 },
+      leadCredit: { type: Number, default: 0 }
     },
     wallet: {
       balance: { type: Number, default: 0 },
     },
+    points: { type: Number, default: 0 },
+    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     withdrawalOTP: { type: String, select: false },
     otpExpires: { type: Date, select: false }
   },

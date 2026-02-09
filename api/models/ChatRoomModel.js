@@ -22,7 +22,11 @@ const ChatRoomSchema = new mongoose.Schema({
         type: Map,
         of: String,
         default: {}
-    }
+    },
+    deletedBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }]
 }, { timestamps: true, collection: "chat_rooms" });
 
 module.exports = mongoose.model("ChatRoom", ChatRoomSchema);

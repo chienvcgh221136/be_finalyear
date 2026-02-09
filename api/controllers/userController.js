@@ -89,4 +89,54 @@ exports.updateProfile = async (req, res) => {
 };
 
 
+exports.blockUser = async (req, res) => {
+  try {
+    const { userIdToBlock } = req.body;
+    const userId = req.user.userId;
+
+    if (userId === userIdToBlock) {
+      return res.status(400).json({ success: false, message: "Cannot block yourself" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user.blockedUsers.includes(userIdToBlock)) {
+      user.blockedUsers.push(userIdToBlock);
+      await user.save();
+    }
+
+    res.json({ success: true, message: "User blocked successfully", blockedUsers: user.blockedUsers });
+  } catch (err) {
+    console.error("Block user error:", err);
+    res.status(500).json({ success: false, message: "Error blocking user" });
+  }
+};
+
+exports.unblockUser = async (req, res) => {
+  try {
+    const { userIdToUnblock } = req.body;
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId);
+    user.blockedUsers = user.blockedUsers.filter(id => id.toString() !== userIdToUnblock);
+    await user.save();
+
+    res.json({ success: true, message: "User unblocked successfully", blockedUsers: user.blockedUsers });
+  } catch (err) {
+    console.error("Unblock user error:", err);
+    res.status(500).json({ success: false, message: "Error unblocking user" });
+  }
+};
+
+exports.getBlockedUsers = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId).populate("blockedUsers", "name avatar");
+
+    res.json({ success: true, blockedUsers: user.blockedUsers });
+  } catch (err) {
+    console.error("Get blocked users error:", err);
+    res.status(500).json({ success: false, message: "Error fetching blocked users" });
+  }
+};
+
 module.exports = exports;

@@ -5,7 +5,7 @@ const notificationSchema = new mongoose.Schema({
     senderId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // optional, system notifications might not have sender
     type: {
         type: String,
-        enum: ["REPORT", "APPOINTMENT", "LIKE", "LEAD", "REVIEW", "SYSTEM"],
+        enum: ["REPORT", "APPOINTMENT", "LIKE", "LEAD", "REVIEW", "SYSTEM", "POINT"],
         required: true
     },
     message: { type: String, required: true },
