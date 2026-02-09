@@ -26,6 +26,12 @@ exports.createOrGetChat = async (req, res) => {
             // Chat exists, update the context (postId) to the new post
             chatRoom.postId = postId;
             chatRoom.lastMessageAt = Date.now(); // Optional: bump time or just keep
+
+            // If the user had previously deleted this chat, un-delete it
+            if (chatRoom.deletedBy && chatRoom.deletedBy.includes(buyerId)) {
+                chatRoom.deletedBy = chatRoom.deletedBy.filter(id => id.toString() !== buyerId);
+            }
+
             await chatRoom.save();
         } else {
             // Create new chat room
@@ -33,7 +39,8 @@ exports.createOrGetChat = async (req, res) => {
                 postId,
                 userIds: [buyerId, sellerId],
                 lastMessage: "",
-                lastMessageAt: Date.now()
+                lastMessageAt: Date.now(),
+                deletedBy: []
             });
 
             // Initialize empty message document
@@ -59,8 +66,11 @@ exports.getMyChats = async (req, res) => {
         console.log("getMyChats request for userId:", userId);
 
         // Use lean() to get plain JavaScript objects we can modify
-        const chats = await ChatRoom.find({ userIds: userId })
-            .populate("userIds", "name avatar email")
+        const chats = await ChatRoom.find({
+            userIds: userId,
+            deletedBy: { $ne: userId } // Exclude chats deleted by this user
+        })
+            .populate("userIds", "name avatar email blockedUsers") // Fetch blockedUsers to check status
             .populate("postId", "title images price address userId") // Added userId to populate
             .sort({ lastMessageAt: -1 })
             .lean();
@@ -69,7 +79,7 @@ exports.getMyChats = async (req, res) => {
         const chatRoomIds = chats.map(c => c._id);
         const messageDocs = await Message.find({ chatRoomId: { $in: chatRoomIds } }).lean();
 
-        // Calculate unread count for each chat
+        // Calculate unread count for each chat & check block status
         const chatsWithUnread = chats.map(chat => {
             const msgDoc = messageDocs.find(m => m.chatRoomId.toString() === chat._id.toString());
             let unreadCount = 0;
@@ -79,7 +89,19 @@ exports.getMyChats = async (req, res) => {
                     msg.senderId.toString() !== userId && !msg.isRead
                 ).length;
             }
-            return { ...chat, unreadCount };
+
+            // Check if I am blocked by the other user
+            const otherUser = chat.userIds.find(u => u._id.toString() !== userId);
+            let blockedByOther = false;
+
+            if (otherUser && otherUser.blockedUsers) {
+                // Check if my ID is in their blocked list
+                blockedByOther = otherUser.blockedUsers.some(id => id.toString() === userId);
+                // Remove blockedUsers list from output for privacy
+                delete otherUser.blockedUsers;
+            }
+
+            return { ...chat, unreadCount, blockedByOther };
         });
 
         console.log(`Found ${chatsWithUnread.length} chats for user ${userId}`);
@@ -120,6 +142,27 @@ exports.sendMessage = async (req, res) => {
             return res.status(400).json({ success: false, message: "Content is required" });
         }
 
+        const chatRoom = await ChatRoom.findById(chatRoomId);
+        if (!chatRoom) {
+            return res.status(404).json({ success: false, message: "Chat room not found" });
+        }
+
+        // Check for blocked users
+        const receiverId = chatRoom.userIds.find(id => id.toString() !== senderId);
+
+        // Check if sender has blocked receiver OR receiver has blocked sender
+        const sender = await User.findById(senderId);
+        const receiver = await User.findById(receiverId);
+
+        if (sender.blockedUsers && sender.blockedUsers.includes(receiverId)) {
+            return res.status(403).json({ success: false, message: "You have blocked this user. Unblock to send message." });
+        }
+
+        if (receiver.blockedUsers && receiver.blockedUsers.includes(senderId)) {
+            return res.status(403).json({ success: false, message: "You identify as blocked by this user." });
+        }
+
+
         // Find the message document for this chat room
         let messageDoc = await Message.findOne({ chatRoomId });
         if (!messageDoc) {
@@ -142,10 +185,18 @@ exports.sendMessage = async (req, res) => {
         await messageDoc.save();
 
         // Update ChatRoom lastMessage
-        await ChatRoom.findByIdAndUpdate(chatRoomId, {
+        // Also un-delete the chat for the receiver if they deleted it
+        const updateData = {
             lastMessage: type === 'IMAGE' ? '[Hình ảnh]' : content,
             lastMessageAt: new Date()
-        });
+        };
+
+        if (chatRoom.deletedBy.includes(receiverId)) {
+            // Remove receiverId from deletedBy
+            updateData.$pull = { deletedBy: receiverId };
+        }
+
+        await ChatRoom.findByIdAndUpdate(chatRoomId, updateData);
 
         res.json({ success: true, newMessage });
     } catch (error) {
@@ -230,7 +281,7 @@ exports.markAsRead = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-// Delete Chat
+// Delete Chat (Soft Delete)
 exports.deleteChat = async (req, res) => {
     try {
         const { chatRoomId } = req.params;
@@ -246,13 +297,13 @@ exports.deleteChat = async (req, res) => {
             return res.status(404).json({ success: false, message: "Chat not found or unauthorized" });
         }
 
-        // Delete ChatRoom
-        await ChatRoom.findByIdAndDelete(chatRoomId);
+        // Add user to deletedBy array if not already there
+        if (!chatRoom.deletedBy.includes(userId)) {
+            chatRoom.deletedBy.push(userId);
+            await chatRoom.save();
+        }
 
-        // Delete Messages
-        await Message.findOneAndDelete({ chatRoomId });
-
-        res.json({ success: true, message: "Chat deleted successfully" });
+        res.json({ success: true, message: "Chat deleted found successfully" });
     } catch (error) {
         console.error("Delete chat error:", error);
         res.status(500).json({ success: false, message: error.message });

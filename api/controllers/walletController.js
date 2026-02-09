@@ -26,6 +26,8 @@ exports.topup = async (req, res) => {
 
         const wallet = await getWallet(req.user.userId);
 
+        const isFirstTopup = wallet.totalTopup === 0;
+
         // Logic topup (simulated success)
         wallet.balance += amount;
         wallet.totalTopup += amount;
@@ -44,17 +46,41 @@ exports.topup = async (req, res) => {
             description: `Topup via ${method || 'BANK'}`
         });
 
+        // --- POINT EARNING LOGIC ---
+        const pointController = require("./pointController");
+        let pointsEarned = Math.floor(amount / 1000);
+        let bonusPoints = 0;
+
+        if (isFirstTopup) {
+            bonusPoints = 200;
+            pointsEarned += bonusPoints;
+        }
+
+        if (pointsEarned > 0) {
+            await pointController.addPoints(
+                req.user.userId,
+                isFirstTopup ? "FIRST_TOPUP_BONUS" : "TOPUP_REWARD",
+                pointsEarned,
+                null
+            );
+        }
+
         // Notify User
         const NotificationController = require("./notificationController");
+        let notifMessage = `Nạp tiền thành công: +${amount.toLocaleString('vi-VN')}đ. Số dư hiện tại: ${wallet.balance.toLocaleString('vi-VN')}đ.`;
+        if (pointsEarned > 0) {
+            notifMessage += ` Bạn nhận được ${pointsEarned} điểm thưởng${isFirstTopup ? ' (bao gồm quà nạp đầu)!' : '!'}`;
+        }
+
         await NotificationController.createNotification({
             recipientId: req.user.userId,
             senderId: null,
             type: "SYSTEM",
-            message: `Nạp tiền thành công: +${amount.toLocaleString('vi-VN')}đ. Số dư hiện tại: ${wallet.balance.toLocaleString('vi-VN')}đ.`,
-            relatedId: wallet.userId // or transaction id if available in future, for now using userId or null
+            message: notifMessage,
+            relatedId: wallet.userId
         });
 
-        res.json({ success: true, balance: wallet.balance });
+        res.json({ success: true, balance: wallet.balance, pointsEarned });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -113,6 +139,8 @@ exports.sepayWebhook = async (req, res) => {
         // Let's rely on Sepay's guarantees or simple duplicate check if we had a field. 
 
         // Update Wallet
+        const isFirstTopup = wallet.totalTopup === 0;
+
         wallet.balance += amount;
         wallet.totalTopup += amount;
         await wallet.save();
@@ -136,6 +164,25 @@ exports.sepayWebhook = async (req, res) => {
             refId: null
         });
 
+        // --- POINT EARNING LOGIC ---
+        const pointController = require("./pointController");
+        let pointsEarned = Math.floor(amount / 1000);
+        let bonusPoints = 0;
+
+        if (isFirstTopup) {
+            bonusPoints = 200;
+            pointsEarned += bonusPoints;
+        }
+
+        if (pointsEarned > 0) {
+            await pointController.addPoints(
+                userId,
+                isFirstTopup ? "FIRST_TOPUP_BONUS" : "TOPUP_REWARD",
+                pointsEarned,
+                null
+            );
+        }
+
         // Send Email Notification
         if (user && user.email) {
             emailService.sendTopupSuccessEmail(user.email, user.name, amount, wallet.balance)
@@ -144,11 +191,16 @@ exports.sepayWebhook = async (req, res) => {
 
         // Notify User
         const NotificationController = require("./notificationController");
+        let notifMessage = `Nạp tiền thành công (Sepay): +${amount.toLocaleString('vi-VN')}đ. Số dư hiện tại: ${wallet.balance.toLocaleString('vi-VN')}đ.`;
+        if (pointsEarned > 0) {
+            notifMessage += ` Bạn nhận được ${pointsEarned} điểm thưởng${isFirstTopup ? ' (bao gồm quà nạp đầu)!' : '!'}`;
+        }
+
         await NotificationController.createNotification({
             recipientId: userId,
             senderId: null,
             type: "SYSTEM",
-            message: `Nạp tiền thành công (Sepay): +${amount.toLocaleString('vi-VN')}đ. Số dư hiện tại: ${wallet.balance.toLocaleString('vi-VN')}đ.`,
+            message: notifMessage,
             relatedId: null
         });
 

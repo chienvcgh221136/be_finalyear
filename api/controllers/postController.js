@@ -32,6 +32,10 @@ exports.createPost = async (req, res) => {
             relatedId: post._id
         });
 
+        // Add Loyalty Points (50 points)
+        const pointController = require("./pointController");
+        await pointController.addPoints(req.user.userId, "POST_CREATED", 50, post._id);
+
         res.status(201).json({ success: true, data: post });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });

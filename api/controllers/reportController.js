@@ -76,6 +76,53 @@ exports.createReport = async (req, res) => {
   }
 };
 
+exports.createUserReport = async (req, res) => {
+  try {
+    const { reason, description, targetUserId, chatRoomId } = req.body;
+
+    // 1. Check if there is ANY pending report for this user by this reporter
+    const pendingReport = await Report.findOne({
+      targetUserId,
+      reporterId: req.user.userId,
+      status: "PENDING",
+      type: "USER"
+    });
+
+    if (pendingReport)
+      return res.status(400).json({ success: false, message: "Bạn đang có báo cáo chờ xử lý cho người dùng này" });
+
+    const report = await Report.create({
+      targetUserId,
+      chatRoomId, // Add this line
+      reporterId: req.user.userId,
+      reason,
+      description,
+      type: "USER"
+    });
+
+    // Notify Admins
+    // ... (existing admin notification logic)
+    const User = require("../models/UserModel");
+    const admins = await User.find({ role: "ADMIN" }, "_id");
+    if (admins.length > 0) {
+      const adminNotifications = admins.map(admin => ({
+        recipientId: admin._id,
+        senderId: req.user.userId,
+        type: "REPORT",
+        message: `Báo cáo mới từ người dùng về một tài khoản (Lý do: ${reason}).`,
+        relatedId: report._id, // Use report ID or targetUserId? Report ID seems safer for admin link
+        isRead: false
+      }));
+      const Notification = require("../models/NotificationModel");
+      await Notification.insertMany(adminNotifications);
+    }
+
+    res.json({ success: true, data: report });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getAllReports = async (req, res) => {
   const reports = await Report.find()
     .populate({
@@ -86,6 +133,8 @@ exports.getAllReports = async (req, res) => {
         select: "name email violationCount isBanned"
       }
     })
+    .populate("targetUserId", "name email violationCount isBanned") // Added population for user reports
+    .populate("chatRoomId") // Populate chat room info
     .populate("reporterId", "name email")
     .sort({ createdAt: -1 });
 
@@ -98,14 +147,24 @@ exports.resolveReport = async (req, res) => {
       req.params.id,
       { status: "RESOLVED" },
       { new: true }
-    ).populate({
-      path: 'postId',
-      populate: { path: 'userId' } // Get owner of post
-    });
+    )
+      .populate({
+        path: 'postId',
+        populate: { path: 'userId' } // Get owner of post
+      })
+      .populate('targetUserId'); // Get reported user
 
-    if (report && report.postId && report.postId.userId) {
-      const owner = report.postId.userId;
+    let owner = null;
+    let title = "Tài khoản của bạn"; // Default title for notification
 
+    if (report.type === 'USER' && report.targetUserId) {
+      owner = report.targetUserId;
+    } else if (report.postId && report.postId.userId) {
+      owner = report.postId.userId;
+      title = `Bài đăng "${report.postId.title}"`;
+    }
+
+    if (owner) {
       // Increment violation count
       owner.violationCount = (owner.violationCount || 0) + 1;
       await owner.save();
@@ -113,13 +172,26 @@ exports.resolveReport = async (req, res) => {
       const emailService = require("../services/emailService");
 
       // Send Warning Email
-      await emailService.sendViolationWarning(
-        owner.email,
-        owner.name,
-        report.postId.title,
-        report.reason,
-        report.description
-      );
+      try {
+        if (report.type === 'USER') {
+          await emailService.sendUserViolationWarning(
+            owner.email,
+            owner.name,
+            report.reason,
+            report.description
+          );
+        } else {
+          await emailService.sendViolationWarning(
+            owner.email,
+            owner.name,
+            report.postId ? report.postId.title : 'Bài đăng',
+            report.reason,
+            report.description
+          );
+        }
+      } catch (emailError) {
+        console.error("Failed to send violation email:", emailError);
+      }
 
       // Notify User (In-App)
       const NotificationController = require("./notificationController");
@@ -127,8 +199,8 @@ exports.resolveReport = async (req, res) => {
         recipientId: owner._id,
         senderId: null, // System
         type: "REPORT",
-        message: `Bài đăng "${report.postId.title}" của bạn đã bị báo cáo vi phạm: ${report.reason}. Vui lòng kiểm tra lại.`,
-        relatedId: report.postId._id
+        message: `${title} đã bị báo cáo vi phạm: ${report.reason}. Vui lòng kiểm tra lại.`,
+        relatedId: report.postId ? report.postId._id : null
       });
     }
 

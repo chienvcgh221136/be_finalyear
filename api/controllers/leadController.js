@@ -26,25 +26,16 @@ exports.showPhone = async (req, res) => {
         if (!lead) {
             const currentUser = await User.findById(userId);
 
-            // 1. Check VIP
-            if (!currentUser.vip || !currentUser.vip.isActive) {
-                return res.status(403).json({
-                    success: false,
-                    message: "Bạn cần nâng cấp gói VIP để xem số điện thoại người đăng."
-                });
-            }
+            // Check VIP status
+            const isVipValid = currentUser.vip && currentUser.vip.isActive && (!currentUser.vip.expiredAt || new Date() <= new Date(currentUser.vip.expiredAt));
 
-            // 2. Check Expired VIP
-            if (new Date() > new Date(currentUser.vip.expiredAt)) {
-                return res.status(403).json({
-                    success: false,
-                    message: "Gói VIP của bạn đã hết hạn. Vui lòng gia hạn."
-                });
+            // Get Package Limit
+            let limit = 0;
+            if (currentUser.vip.packageId) {
+                const pkg = await VipPackage.findById(currentUser.vip.packageId);
+                limit = pkg ? (pkg.limitViewPhone || 0) : 0;
             }
-
-            // 3. Check Limit View Phone per Day
-            const pkg = await VipPackage.findById(currentUser.vip.packageId);
-            const limit = pkg ? pkg.limitViewPhone : 0;
+            if (!isVipValid) limit = 0;
 
             // Count today's usage
             const startOfDay = new Date();
@@ -56,11 +47,24 @@ exports.showPhone = async (req, res) => {
                 createdAt: { $gte: startOfDay }
             });
 
+            // Check Limit & Bonus
             if (todayCount >= limit) {
-                return res.status(403).json({
-                    success: false,
-                    message: `Bạn đã đạt giới hạn xem ${limit} số điện thoại/ngày. Nâng cấp gói cao hơn để xem thêm.`
-                });
+                // Try to use Bonus Credits
+                if ((currentUser.vip.bonusLeadCredits || 0) > 0) {
+                    currentUser.vip.bonusLeadCredits -= 1;
+                    await currentUser.save();
+                } else {
+                    if (!isVipValid) {
+                        return res.status(403).json({
+                            success: false,
+                            message: "Bạn cần nâng cấp gói VIP hoặc sử dụng items để xem số điện thoại."
+                        });
+                    }
+                    return res.status(403).json({
+                        success: false,
+                        message: `Bạn đã đạt giới hạn xem ${limit} số điện thoại/ngày. Nâng cấp gói cao hơn hoặc sử dụng items.`
+                    });
+                }
             }
 
             lead = await Lead.create({
