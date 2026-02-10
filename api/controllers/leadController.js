@@ -16,10 +16,15 @@ exports.showPhone = async (req, res) => {
             return res.status(404).json({ success: false, message: "Post not found" });
 
         // Check đã từng xem số chưa
+        // Check đã từng xem số trong ngày hôm nay chưa
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
         let lead = await Lead.findOne({
             postId: post._id,
             buyerId: userId,
-            type: "SHOW_PHONE"
+            type: "SHOW_PHONE",
+            createdAt: { $gte: startOfDay }
         });
 
         // Nếu chưa xem và muốn xem mới -> Check VIP & Limit
@@ -38,8 +43,7 @@ exports.showPhone = async (req, res) => {
             if (!isVipValid) limit = 0;
 
             // Count today's usage
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
+
 
             const todayCount = await Lead.countDocuments({
                 buyerId: userId,
@@ -88,8 +92,6 @@ exports.showPhone = async (req, res) => {
 
         // 4. Calculate updated daily usage to return
         // Count today's usage again to be sure (including the one just created if any)
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
 
         const todayViewedPhones = await Lead.countDocuments({
             buyerId: userId,
