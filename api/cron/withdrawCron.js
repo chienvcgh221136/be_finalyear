@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const WithdrawRequest = require('../models/WithdrawRequestModel');
 const emailService = require('../services/emailService');
 const { Wallet, Transaction } = require('../models/WalletModel');
-const User = require('../models/UserModel'); // Ensure User model is loaded
+
 
 // Run every 10 minutes
 cron.schedule('*/10 * * * *', async () => {

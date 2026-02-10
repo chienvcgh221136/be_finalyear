@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const Post = require('../models/PostModel');
 const User = require('../models/UserModel');
-const VipPackage = require('../models/VipPackageModel');
+
 
 // 4.1 Auto Bump VIP Posts
 // Runs every hour to check bump eligibility
