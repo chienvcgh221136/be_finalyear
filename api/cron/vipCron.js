@@ -38,8 +38,13 @@ cron.schedule('0 * * * *', async () => {
 cron.schedule('0 0 * * *', async () => {
     console.log('[CRON] Running Daily VIP Reset...');
     try {
-        // Find all users with active VIP
-        const users = await User.find({ "vip.isActive": true });
+        // Find all users with active VIP OR those who have currently attached posts (from points reward)
+        const users = await User.find({
+            $or: [
+                { "vip.isActive": true },
+                { "vip.currentVipPosts": { $exists: true, $not: { $size: 0 } } }
+            ]
+        });
 
         for (const user of users) {
             // 1. Detach all yesterday's VIP posts

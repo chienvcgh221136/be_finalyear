@@ -3,8 +3,6 @@ const PointLog = require("../models/PointLogModel");
 const VipPackage = require("../models/VipPackageModel");
 
 const Notification = require("../models/NotificationModel");
-const Lead = require("../models/LeadModel");
-const Post = require("../models/PostModel");
 
 // Constants for Reward Costs
 const REWARDS = {
@@ -363,19 +361,24 @@ exports.useInventoryItem = async (req, res) => {
                 newExpiry.setDate(newExpiry.getDate() + totalDays);
             }
 
-            // Update user VIP package
-            user.vip = {
-                isActive: true,
-                vipType: vipType,
-                packageId: vipPackageId,
-                expiredAt: newExpiry,
-                dailyUsedSlots: user.vip?.dailyUsedSlots || 0,
-                lastSlotResetDate: user.vip?.lastSlotResetDate || now,
-                todayViewedPhones: user.vip?.todayViewedPhones || 0,
-                limitViewPhone: user.vip?.limitViewPhone || 0,
-                bonusPushCredits: user.vip?.bonusPushCredits || 0,
-                bonusLeadCredits: user.vip?.bonusLeadCredits || 0
-            };
+            // Update user VIP package fields individually to preserve metadata like currentVipPosts
+            if (!user.vip) user.vip = {};
+            user.vip.isActive = true;
+            user.vip.vipType = vipType;
+            user.vip.packageId = vipPackageId;
+            user.vip.expiredAt = newExpiry;
+
+            // Priority Score is missing from the previous implementation, let's fetch it if possible
+            const pkg = await VipPackage.findById(vipPackageId);
+            if (pkg) user.vip.priorityScore = pkg.priorityScore;
+
+            // Ensure other fields remain or are initialized
+            user.vip.dailyUsedSlots = user.vip.dailyUsedSlots || 0;
+            user.vip.lastSlotResetDate = user.vip.lastSlotResetDate || now;
+            user.vip.todayViewedPhones = user.vip.todayViewedPhones || 0;
+            user.vip.limitViewPhone = user.vip.limitViewPhone || 0;
+            user.vip.bonusPushCredits = user.vip.bonusPushCredits || 0;
+            user.vip.bonusLeadCredits = user.vip.bonusLeadCredits || 0;
 
             // Deduct inventory
             user.inventory[inventoryField] -= quantity;
