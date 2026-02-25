@@ -5,6 +5,7 @@ const auth = require("../middlewares/authMiddleware");
 const role = require("../middlewares/roleMiddleware");
 
 router.get("/", postController.getActivePosts);
+router.get("/suggestions", postController.getSuggestions);
 router.get("/me/list", auth, postController.getMyPosts);
 router.get("/user/:userId/list", postController.getPostsByUser);
 router.get("/:id", auth, postController.getPostById);

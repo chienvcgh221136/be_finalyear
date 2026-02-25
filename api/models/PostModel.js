@@ -5,7 +5,7 @@ const PostSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String },
     transactionType: { type: String, enum: ["RENT", "SALE"], required: true },
-    propertyType: { type: String, enum: ["APARTMENT", "HOUSE", "LAND", "OFFICE", "SHOPHOUSE"], required: true },
+    propertyType: { type: String, enum: ["APARTMENT", "HOUSE", "LAND", "OFFICE", "SHOPHOUSE", "ROOM"], required: true },
     apartmentType: { type: String, enum: ["MINI", "DORM", "SERVICED", "STUDIO", "OFFICETEL", "PENTHOUSE", "DUPLEX", "HIGH_END"], default: null },
     price: { type: Number, required: true },
     deposit: { type: Number, default: 0 },

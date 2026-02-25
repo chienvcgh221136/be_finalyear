@@ -98,6 +98,37 @@ exports.getActivePosts = async (req, res) => {
     }
 };
 
+exports.getSuggestions = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || q.length < 2) return res.json({ success: true, data: [] });
+
+        const searchRegex = { $regex: q, $options: 'i' };
+
+        // We use collation to achieve accent-insensitive search if supported by the environment
+        // strength: 1 means ignore case and diacritics
+        const suggestions = await Post.find({
+            status: 'ACTIVE',
+            $or: [
+                { title: searchRegex },
+                { 'address.city': searchRegex },
+                { 'address.district': searchRegex },
+                { 'address.ward': searchRegex },
+                { 'address.street': searchRegex }
+            ]
+        })
+            .select('title address transactionType propertyType price images')
+            .limit(10)
+            .collation({ locale: 'en', strength: 1 }) // 'en' or 'vi' with strength 1 handles diacritics
+            .lean();
+
+        res.json({ success: true, data: suggestions });
+    } catch (err) {
+        console.error("Suggestions error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 exports.getMyPosts = async (req, res) => {
     try {
         const posts = await Post.find({ userId: req.user.userId });
@@ -168,6 +199,7 @@ exports.getPostById = async (req, res) => {
         return res.status(404).json({ message: "Post not found or restricted" });
 
     } catch (err) {
+        console.error("Get post error:", err);
         res.status(400).json({ success: false, message: "Invalid Post ID or Server Error" });
     }
 };

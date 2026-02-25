@@ -42,40 +42,39 @@ exports.showPhone = async (req, res) => {
             }
             if (!isVipValid) limit = 0;
 
-            // Count today's usage
-
-
             const todayCount = await Lead.countDocuments({
                 buyerId: userId,
                 type: "SHOW_PHONE",
+                isBonus: false, // Loại trừ các lượt đã dùng Bonus
                 createdAt: { $gte: startOfDay }
             });
 
-            // Check Limit & Bonus
-            if (todayCount >= limit) {
-                // Try to use Bonus Credits
-                if ((currentUser.vip.bonusLeadCredits || 0) > 0) {
-                    currentUser.vip.bonusLeadCredits -= 1;
-                    await currentUser.save();
-                } else {
-                    if (!isVipValid) {
-                        return res.status(403).json({
-                            success: false,
-                            message: "Bạn cần nâng cấp gói VIP hoặc sử dụng items để xem số điện thoại."
-                        });
-                    }
+            let usedBonus = false;
+            // Ưu tiên dùng BONUS trước
+            if ((currentUser.vip.bonusLeadCredits || 0) > 0) {
+                currentUser.vip.bonusLeadCredits -= 1;
+                await currentUser.save();
+            }
+            // Nếu KHÔNG CÓ bonus mới kiểm tra LIMIT của gói VIP
+            else if (todayCount >= limit) {
+                if (!isVipValid) {
                     return res.status(403).json({
                         success: false,
-                        message: `Bạn đã đạt giới hạn xem ${limit} số điện thoại/ngày. Nâng cấp gói cao hơn hoặc sử dụng items.`
+                        message: "Bạn cần nâng cấp gói VIP hoặc sử dụng items để xem số điện thoại."
                     });
                 }
+                return res.status(403).json({
+                    success: false,
+                    message: `Bạn đã đạt giới hạn xem ${limit} số điện thoại/ngày. Nâng cấp gói cao hơn hoặc sử dụng items.`
+                });
             }
 
             lead = await Lead.create({
                 postId: post._id,
                 buyerId: userId,
                 sellerId: post.userId._id,
-                type: "SHOW_PHONE"
+                type: "SHOW_PHONE",
+                isBonus: usedBonus // Đánh dấu nếu là lượt thưởng
             });
 
             // Notify Seller
@@ -90,12 +89,11 @@ exports.showPhone = async (req, res) => {
 
         }
 
-        // 4. Calculate updated daily usage to return
-        // Count today's usage again to be sure (including the one just created if any)
 
         const todayViewedPhones = await Lead.countDocuments({
             buyerId: userId,
             type: "SHOW_PHONE",
+            isBonus: false, // Chỉ đếm lượt trong gói
             createdAt: { $gte: startOfDay }
         });
 
