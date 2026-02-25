@@ -24,6 +24,7 @@ const chatRoutes = require("./api/routes/chatRoutes");
 require("./api/cron/withdrawCron"); // Start Cron Jobs
 require("./api/cron/vipCron");
 require("./api/cron/appointmentCron");
+require("./api/cron/pointCron");
 
 const cookieParser = require("cookie-parser");
 

@@ -464,23 +464,22 @@ exports.attachVip = async (req, res) => {
             return res.status(403).json({ message: "No active VIP subscription or bonus credits" });
         }
 
-        const limit = isVipActive ? (user.vip.packageId.postLimit || 0) : 0;
         const bonus = user.vip.bonusPushCredits || 0;
+        const limit = isVipActive ? (user.vip.packageId.postLimit || 0) : 0;
         const currentUsed = user.vip.dailyUsedSlots || 0;
         const needed = postIds.length;
 
-        // Calculate available slots logic
-        const remainingDaily = Math.max(0, limit - currentUsed);
-        let bonusToUse = 0;
+        // 1. Dùng BONUS trước
+        let bonusToUse = Math.min(needed, bonus);
+        let remainingNeededAfterBonus = needed - bonusToUse;
 
-        if (needed > remainingDaily) {
-            const deficit = needed - remainingDaily;
-            if (deficit > bonus) {
-                return res.status(400).json({
-                    message: `Not enough slots. Available: ${remainingDaily} daily + ${bonus} bonus. Needed: ${needed}.`
-                });
-            }
-            bonusToUse = deficit;
+        // 2. Số còn lại mới tính vào LIMIT ngày
+        const remainingDaily = Math.max(0, limit - currentUsed);
+
+        if (remainingNeededAfterBonus > remainingDaily) {
+            return res.status(400).json({
+                message: `Không đủ lượt VIP. Bạn có: ${remainingDaily} lượt gói + ${bonus} lượt thưởng. Bạn cần: ${needed} lượt.`
+            });
         }
 
         if (bonusToUse > 0) {
@@ -520,7 +519,7 @@ exports.attachVip = async (req, res) => {
         );
 
         // Update User
-        user.vip.dailyUsedSlots += needed;
+        user.vip.dailyUsedSlots += remainingNeededAfterBonus; // CHỈ tăng số lượt thực tế dùng từ Gói chính
         validPosts.forEach(p => user.vip.currentVipPosts.push(p._id));
         await user.save();
 

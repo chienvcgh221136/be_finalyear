@@ -41,6 +41,7 @@ const UserSchema = new mongoose.Schema(
       balance: { type: Number, default: 0 },
     },
     points: { type: Number, default: 0 },
+    pointsAnniversaryDate: { type: Date, default: null },
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     withdrawalOTP: { type: String, select: false },
     otpExpires: { type: Date, select: false }

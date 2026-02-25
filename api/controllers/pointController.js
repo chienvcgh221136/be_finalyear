@@ -30,7 +30,14 @@ exports.getMyPoints = async (req, res) => {
             data: {
                 balance: user.points,
                 inventory: user.inventory,
-                history
+                history: history.map(log => ({
+                    _id: log._id,
+                    action: log.action,
+                    points: log.points,
+                    type: log.type,
+                    createdAt: log.createdAt
+                })),
+                expiringSoon: await getExpiringSoon(userId)
             }
         });
     } catch (err) {
@@ -42,10 +49,6 @@ exports.getVipItemsUsageHistory = async (req, res) => {
     try {
         const userId = req.user.userId;
 
-        // Get all inventory items usage history from PointLog
-        // VIP items (Bronze/Silver/Gold) activate user VIP packages
-        // Push Post updates post's createdAt
-        // Lead Credit unlocks customer phone numbers
         const history = await PointLog.find({
             userId,
             action: { $in: ['USE_ITEM_POST_PUSH', 'USE_ITEM_VIP_BRONZE_1DAY', 'USE_ITEM_VIP_SILVER_3DAY', 'USE_ITEM_VIP_GOLD_7DAY', 'USE_LEAD_CREDIT'] }
@@ -149,7 +152,12 @@ exports.redeemReward = async (req, res) => {
         }
 
         // 1. Deduct Points
-        user.points -= cost;
+        await exports.spendPoints(userId, cost, `REDEEM_${rewardKey}`, `Đổi quà: ${REWARDS[rewardKey].label}`);
+
+        // Refresh user for updated balance and inventory
+        const updatedUser = await User.findById(userId);
+
+        res.json({ success: true, message: "Đổi quà thành công!", points: updatedUser.points, inventory: updatedUser.inventory });
 
         // Initialize inventory if not exists
         if (!user.inventory) {
@@ -212,7 +220,7 @@ exports.redeemReward = async (req, res) => {
             relatedId: userId // or maybe null?
         });
 
-        res.json({ success: true, message: "Đổi quà thành công!", points: user.points, inventory: user.inventory });
+        // res.json({ success: true, message: "Đổi quà thành công!", points: user.points, inventory: user.inventory }); // Replaced above
 
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -241,10 +249,6 @@ exports.useInventoryItem = async (req, res) => {
             return res.status(400).json({ message: "Số lượng trong kho không đủ." });
         }
 
-
-        // Push Post and Lead Credit are handled below
-
-        // Handle Push Post - adds bonus push credits to VIP package
         if (itemKey === 'ITEM_POST_PUSH') {
             // Initialize vip object if not exists
             if (!user.vip) {
@@ -470,39 +474,22 @@ exports.adjustUserPoints = async (req, res) => {
         }
 
         const pointAmount = parseInt(amount);
-        // Allow amount 0 for warnings/info logs
-        // if (pointAmount === 0) return res.status(400).json({ message: "Amount cannot be 0" });
+
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: "User not found" });
 
         // Update User Points
-        user.points += pointAmount;
-        await user.save();
+        if (pointAmount > 0) {
+            await exports.addPoints(userId, "ADMIN_ADJUSTMENT", pointAmount, adminId, description || `Admin cộng điểm: +${pointAmount}`);
+        } else {
+            await exports.spendPoints(userId, Math.abs(pointAmount), "ADMIN_ADJUSTMENT", description || `Admin trừ điểm: -${Math.abs(pointAmount)}`, adminId);
+        }
+
+        const updatedUser = await User.findById(userId);
 
         console.log("DEBUG: PointLog Enum Values:", PointLog.schema.path('action').enumValues); // Check if ADMIN_ADJUSTMENT is here
 
-        // Log Transaction
-        await PointLog.create({
-            userId,
-            type: pointAmount > 0 ? "EARN" : "SPEND",
-            action: "ADMIN_ADJUSTMENT",
-            points: Math.abs(pointAmount), // Store absolute value usually, but verify schema expectations.
-            // Previous logPoints used signed passed, but here we explicitly set type.
-            // Let's stick to existing logPoints helper or create directly.
-            // Actually, existing logPoints helper takes signed points if we look at previous code?
-            // "points" in logPoints: "positive for earn, negative for spend" comment in line 85 of previous read.
-            // But PointLog schema might store absolute. Let's check existing controller usage.
-            // In redeemReward (Step 406): `points: cost` (absolute?) but type SPEND.
-            // In addPoints helper: `points` passed direct.
-            // Let's be consistent with redeemReward: Store absolute amount, and use type to distinguish.
-            // Wait, redeemReward in Step 406 Log: `points: cost`. Cost is positive. Type is SPEND.
-            // So PointLog stores absolute value.
-            description: description || `Admin adjusted points: ${pointAmount > 0 ? '+' : ''}${pointAmount}`,
-            relatedId: adminId // Store admin ID who made change
-        });
-
-        // Send Notification to User
         let notifMessage = "";
         let notifType = "POINT";
 
@@ -522,14 +509,14 @@ exports.adjustUserPoints = async (req, res) => {
             senderId: adminId
         });
 
-        res.json({ success: true, message: "Points adjusted successfully", newBalance: user.points });
+        res.json({ success: true, message: "Points adjusted successfully", newBalance: updatedUser.points });
 
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
-exports.addPoints = async (userId, action, points, relatedId) => {
+exports.addPoints = async (userId, action, points, relatedId, description = null) => {
     try {
         const user = await User.findById(userId);
         if (!user) return;
@@ -537,14 +524,46 @@ exports.addPoints = async (userId, action, points, relatedId) => {
         user.points = (user.points || 0) + points;
         await user.save();
 
+        const isAnniversaryAction = ['TOPUP_REWARD', 'FIRST_TOPUP_BONUS', 'VIP_PURCHASE'].includes(action);
+        let expiryDate = null;
+        let remainingPoints = 0;
+
+        if (isAnniversaryAction) {
+            const now = new Date();
+            // 1. Initialize anniversary if not set
+            if (!user.pointsAnniversaryDate) {
+                user.pointsAnniversaryDate = now;
+                await user.save();
+            }
+
+            // 2. Calculate anniversary for the current year
+            const anniversary = new Date(user.pointsAnniversaryDate);
+            // anniversaryDate only (month and day) applied to the current year
+            const anniversaryDateCurrentYear = new Date(now.getFullYear(), anniversary.getMonth(), anniversary.getDate());
+
+            // Normalize 'now' to start of day for accurate comparison
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            let expiryYear = now.getFullYear();
+            // If today is the anniversary or it has passed this year, the expiry is next year.
+            if (today >= anniversaryDateCurrentYear) {
+                expiryYear = now.getFullYear() + 1;
+            }
+
+            expiryDate = new Date(expiryYear, anniversary.getMonth(), anniversary.getDate(), 23, 59, 59, 999);
+            remainingPoints = points;
+        }
+
         // Create Log
         await PointLog.create({
             userId,
             type: "EARN",
             action,
             points,
+            remainingPoints,
+            expiryDate,
             relatedId,
-            description: `Tích lũy từ hoạt động: ${action}`
+            description: description || `Tích lũy từ hoạt động: ${action}`
         });
 
         // Create Notification
@@ -563,5 +582,76 @@ exports.addPoints = async (userId, action, points, relatedId) => {
 
     } catch (err) {
         console.error("Error in addPoints helper:", err);
+    }
+};
+
+exports.spendPoints = async (userId, amount, action, description, relatedId = null) => {
+    try {
+        const user = await User.findById(userId);
+        if (!user || user.points < amount) {
+            throw new Error("Không đủ điểm để thực hiện giao dịch.");
+        }
+
+        // 1. Deduct from User Total
+        user.points -= amount;
+        await user.save();
+
+        // 2. FIFO logic: Spend points from the oldest unexpired batches
+        let remainingToSpend = amount;
+
+        // Find earn logs with remaining points, not expired, sorted by expiry (oldest first)
+        const pointBatches = await PointLog.find({
+            userId,
+            type: 'EARN',
+            remainingPoints: { $gt: 0 },
+            expiryDate: { $gt: new Date() }
+        }).sort({ expiryDate: 1 });
+
+        for (const batch of pointBatches) {
+            if (remainingToSpend <= 0) break;
+
+            const spentFromBatch = Math.min(batch.remainingPoints, remainingToSpend);
+            batch.remainingPoints -= spentFromBatch;
+            remainingToSpend -= spentFromBatch;
+            await batch.save();
+        }
+
+        // 3. Log the SPEND action
+        await PointLog.create({
+            userId,
+            type: "SPEND",
+            action,
+            points: amount,
+            relatedId,
+            description
+        });
+
+    } catch (err) {
+        console.error("Error in spendPoints helper:", err);
+        throw err;
+    }
+};
+
+const getExpiringSoon = async (userId) => {
+    try {
+        const expiringBatches = await PointLog.find({
+            userId,
+            type: 'EARN',
+            remainingPoints: { $gt: 0 },
+            expiryDate: { $ne: null, $gt: new Date() }
+        }).sort({ expiryDate: 1 });
+
+        const totalExpiring = expiringBatches.reduce((sum, batch) => sum + batch.remainingPoints, 0);
+
+        const firstBatch = expiringBatches[0];
+        return {
+            total: totalExpiring,
+            expiryDay: firstBatch ? new Date(firstBatch.expiryDate).getDate() : null,
+            expiryMonth: firstBatch ? new Date(firstBatch.expiryDate).getMonth() + 1 : null,
+            year: firstBatch ? new Date(firstBatch.expiryDate).getFullYear() : null
+        };
+    } catch (err) {
+        console.error("Error in getExpiringSoon helper:", err);
+        return { total: 0, batches: [] };
     }
 };

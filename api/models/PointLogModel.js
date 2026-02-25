@@ -40,11 +40,21 @@ const PointLogSchema = new mongoose.Schema({
             "USE_ITEM_VIP_BRONZE_1DAY",
             "USE_ITEM_VIP_SILVER_3DAY",
             "USE_ITEM_VIP_GOLD_7DAY",
-            "USE_LEAD_CREDIT"
+            "USE_LEAD_CREDIT",
+
+            // Expiry
+            "EXPIRED"
         ]
     },
 
     points: { type: Number, required: true }, // Absolute value
+    remainingPoints: { type: Number, default: 0 }, // For EARN type, how many points are left to spend
+    expiryDate: { type: Date, default: null }, // For EARN type, when these points expire
+
+    // Tracking notifications
+    notified30: { type: Boolean, default: false },
+    notified7: { type: Boolean, default: false },
+    notified1: { type: Boolean, default: false },
 
     // Optional metadata for linking to objects
     relatedId: { type: mongoose.Schema.Types.ObjectId, default: null }, // e.g. PostID, TransactionID

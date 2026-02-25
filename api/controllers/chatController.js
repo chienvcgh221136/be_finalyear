@@ -65,15 +65,21 @@ exports.getMyChats = async (req, res) => {
         const userId = req.user.userId;
         console.log("getMyChats request for userId:", userId);
 
-        // Use lean() to get plain JavaScript objects we can modify
-        const chats = await ChatRoom.find({
-            userIds: userId,
-            deletedBy: { $ne: userId } // Exclude chats deleted by this user
+        // Fetch all rooms user is part of
+        const allChats = await ChatRoom.find({
+            userIds: userId
         })
-            .populate("userIds", "name avatar email blockedUsers") // Fetch blockedUsers to check status
-            .populate("postId", "title images price address userId") // Added userId to populate
+            .populate("userIds", "name avatar email blockedUsers")
+            .populate("postId", "title images price address userId")
             .sort({ lastMessageAt: -1 })
             .lean();
+
+        // Filter chats: include if NEVER deleted OR lastMessageAt > deletedAt
+        const chats = allChats.filter(chat => {
+            const deletedAt = chat.deletedAt ? chat.deletedAt[userId] : null;
+            if (!deletedAt) return true;
+            return new Date(chat.lastMessageAt) > new Date(deletedAt);
+        });
 
         // Fetch all message documents for these chats to count unread
         const chatRoomIds = chats.map(c => c._id);
@@ -83,11 +89,16 @@ exports.getMyChats = async (req, res) => {
         const chatsWithUnread = chats.map(chat => {
             const msgDoc = messageDocs.find(m => m.chatRoomId.toString() === chat._id.toString());
             let unreadCount = 0;
+            const deletedAt = chat.deletedAt ? chat.deletedAt[userId] : null;
+
             if (msgDoc && msgDoc.messages) {
-                // Count messages NOT sent by me and NOT read
-                unreadCount = msgDoc.messages.filter(msg =>
-                    msg.senderId.toString() !== userId && !msg.isRead
-                ).length;
+                // Count messages NOT sent by me, NOT read, and AFTER my deletion timestamp
+                unreadCount = msgDoc.messages.filter(msg => {
+                    const isNotMe = msg.senderId.toString() !== userId;
+                    const isUnread = !msg.isRead;
+                    const isAfterDelete = deletedAt ? new Date(msg.createdAt) > new Date(deletedAt) : true;
+                    return isNotMe && isUnread && isAfterDelete;
+                }).length;
             }
 
             // Check if I am blocked by the other user
@@ -104,7 +115,7 @@ exports.getMyChats = async (req, res) => {
             return { ...chat, unreadCount, blockedByOther };
         });
 
-        console.log(`Found ${chatsWithUnread.length} chats for user ${userId}`);
+        console.log(`Found ${chatsWithUnread.length} visible chats for user ${userId} (from ${allChats.length} total)`);
 
         res.json({ success: true, chats: chatsWithUnread });
     } catch (error) {
@@ -117,14 +128,31 @@ exports.getMyChats = async (req, res) => {
 exports.getMessages = async (req, res) => {
     try {
         const { chatRoomId } = req.params;
-        const messages = await Message.findOne({ chatRoomId });
+        const userId = req.user.userId;
 
-        if (!messages) {
+        const chatRoom = await ChatRoom.findById(chatRoomId);
+        if (!chatRoom) {
+            return res.status(404).json({ success: false, message: "Chat room not found" });
+        }
+
+        const messageDoc = await Message.findOne({ chatRoomId });
+
+        if (!messageDoc) {
             // Return empty structure consistent with MessageData type
             return res.json({ success: true, data: { messages: [] } });
         }
 
-        res.json({ success: true, data: messages });
+        // Filter messages based on deletedAt timestamp for this user
+        const deletedAt = chatRoom.deletedAt && chatRoom.deletedAt.get(userId);
+        let filteredMessages = messageDoc.messages;
+
+        if (deletedAt) {
+            filteredMessages = messageDoc.messages.filter(msg =>
+                new Date(msg.createdAt) > new Date(deletedAt)
+            );
+        }
+
+        res.json({ success: true, data: { ...messageDoc.toObject(), messages: filteredMessages } });
     } catch (error) {
         console.error("Get messages error:", error);
         res.status(500).json({ success: false, message: error.message });
@@ -191,9 +219,16 @@ exports.sendMessage = async (req, res) => {
             lastMessageAt: new Date()
         };
 
-        if (chatRoom.deletedBy.includes(receiverId)) {
-            // Remove receiverId from deletedBy
+        // If the sender had previously deleted this chat, their own message makes it reapppear for them too
+        // but starting from this message. Actually, the timestamp logic handles this because lastMessageAt > deletedAt.
+        // However, we want to be explicit if we are using deletedBy too.
+        if (chatRoom.deletedBy && chatRoom.deletedBy.includes(receiverId)) {
             updateData.$pull = { deletedBy: receiverId };
+        }
+        // If sender is in deletedBy, we should probably pull them too so they see the chat they just messaged in
+        if (chatRoom.deletedBy && chatRoom.deletedBy.includes(senderId)) {
+            if (!updateData.$pull) updateData.$pull = {};
+            updateData.$pull.deletedBy = senderId;
         }
 
         await ChatRoom.findByIdAndUpdate(chatRoomId, updateData);
@@ -217,16 +252,45 @@ exports.searchMessages = async (req, res) => {
         const userChats = await ChatRoom.find({ userIds: userId }).select('_id');
         const chatRoomIds = userChats.map(c => c._id);
 
+        // 2. Fetch the deletedAt timestamps for this user for all relevant chats
+        const chatsWithInfo = await ChatRoom.find({ _id: { $in: chatRoomIds } }).select('deletedAt').lean();
+
         // 2. Search in Message collection
-        // We need to find documents where 'messages.content' matches query
-        // But we want individual messages. Aggregate is best here.
         const results = await Message.aggregate([
             { $match: { chatRoomId: { $in: chatRoomIds } } },
             { $unwind: "$messages" },
             {
                 $match: {
                     "messages.content": { $regex: query, $options: "i" }
-                    // Optional: Filter by type TEXT if needed, but maybe searching URL text is okay or not.
+                }
+            },
+            {
+                $addFields: {
+                    userChatInfo: {
+                        $first: {
+                            $filter: {
+                                input: chatsWithInfo,
+                                as: "c",
+                                cond: { $eq: ["$$c._id", "$chatRoomId"] }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                $match: {
+                    $expr: {
+                        $or: [
+                            { $eq: ["$userChatInfo.deletedAt", null] },
+                            { $not: { $getField: { field: { $toString: userId }, input: "$userChatInfo.deletedAt" } } },
+                            {
+                                $gt: [
+                                    "$messages.createdAt",
+                                    { $getField: { field: { $toString: userId }, input: "$userChatInfo.deletedAt" } }
+                                ]
+                            }
+                        ]
+                    }
                 }
             },
             {
@@ -297,13 +361,22 @@ exports.deleteChat = async (req, res) => {
             return res.status(404).json({ success: false, message: "Chat not found or unauthorized" });
         }
 
-        // Add user to deletedBy array if not already there
-        if (!chatRoom.deletedBy.includes(userId)) {
-            chatRoom.deletedBy.push(userId);
-            await chatRoom.save();
+        // Initialize deletedAt map if it doesn't exist
+        if (!chatRoom.deletedAt) {
+            chatRoom.deletedAt = new Map();
         }
 
-        res.json({ success: true, message: "Chat deleted found successfully" });
+        // Set deletion timestamp for the current user
+        chatRoom.deletedAt.set(userId, new Date());
+
+        // Also keep deletedBy for backward compatibility if needed
+        if (!chatRoom.deletedBy.includes(userId)) {
+            chatRoom.deletedBy.push(userId);
+        }
+
+        await chatRoom.save();
+
+        res.json({ success: true, message: "Chat deleted effectively for you" });
     } catch (error) {
         console.error("Delete chat error:", error);
         res.status(500).json({ success: false, message: error.message });
