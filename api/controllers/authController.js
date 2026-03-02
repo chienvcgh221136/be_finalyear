@@ -2,14 +2,35 @@ const User = require("../models/UserModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const calculatePasswordStrength = (password) => {
+    if (!password) return 0;
+    let score = 0;
+    if (password.length >= 8) score += 25;
+    if (/[A-Z]/.test(password)) score += 15;
+    if (/[a-z]/.test(password)) score += 15;
+    if (/[0-9]/.test(password)) score += 20;
+    if (/[^A-Za-z0-9]/.test(password)) score += 25;
+    return score;
+};
+
 exports.register = async (req, res) => {
     try {
-        const { name, email, password, phone } = req.body;
+        let { name, email, password, phone } = req.body;
         if (!name || !email || !password || !phone)
             return res.status(400).json({
                 success: false,
                 message: "Missing fields"
             });
+
+        email = email.toLowerCase();
+
+        const score = calculatePasswordStrength(password);
+        if (score < 70) {
+            return res.status(400).json({
+                success: false,
+                message: "Mật khẩu quá yếu. Cần đạt ít nhất 70% mức độ an toàn."
+            });
+        }
 
         const existEmail = await User.findOne({ email });
         if (existEmail) return res.status(400).json({
@@ -48,12 +69,14 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
         if (!email || !password)
             return res.status(400).json({
                 success: false,
                 message: "Missing email or password"
             });
+
+        email = email.toLowerCase();
 
         const user = await User.findOne({ email });
         if (!user)
@@ -104,8 +127,6 @@ exports.login = async (req, res) => {
             sameSite: 'strict',
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
-
-
 
         // --- DAILY LOGIN POINTS ---
         try {
@@ -204,7 +225,8 @@ exports.googleLogin = async (req, res) => {
             audience: process.env.GOOGLE_CLIENT_ID,
         });
         const payload = ticket.getPayload();
-        const { sub: googleId, email, name, picture } = payload;
+        const { sub: googleId, name, picture } = payload;
+        const email = payload.email.toLowerCase();
 
         let user = await User.findOne({
             $or: [{ googleId }, { email }]
@@ -301,4 +323,104 @@ exports.googleLogin = async (req, res) => {
     }
 };
 
+exports.forgotPasswordCheckEmail = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ success: false, message: "Email is required" });
 
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) return res.status(404).json({ success: false, message: "Email không tồn tại trong hệ thống" });
+
+        res.json({ success: true, message: "Email hợp lệ" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Lỗi kiểm tra email", error: err.message });
+    }
+};
+
+exports.forgotPasswordSendOTP = async (req, res) => {
+    try {
+        const { email, phone } = req.body;
+        if (!email || !phone) return res.status(400).json({ success: false, message: "Missing email or phone" });
+
+        const user = await User.findOne({
+            email: email.toLowerCase(),
+            phone: phone.trim()
+        });
+
+        if (!user) return res.status(400).json({ success: false, message: "Số điện thoại không khớp với email đã đăng ký" });
+
+        const crypto = require("crypto");
+        const otp = crypto.randomInt(100000, 999999).toString();
+        const otpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+        user.resetPasswordOTP = otp;
+        user.resetPasswordOTPExpires = otpExpires;
+        await user.save();
+
+        const emailService = require("../services/emailService");
+        await emailService.sendPasswordResetOTP(user.email, user.name, otp);
+
+        res.json({ success: true, message: "Mã OTP đã được gửi đến email của bạn" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Lỗi gửi OTP", error: err.message });
+    }
+};
+
+exports.forgotPasswordVerifyOTP = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        if (!email || !otp) return res.status(400).json({ success: false, message: "Missing email or OTP" });
+
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        }).select("+resetPasswordOTP +resetPasswordOTPExpires");
+
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        if (user.resetPasswordOTP !== otp || user.resetPasswordOTPExpires < Date.now()) {
+            return res.status(400).json({ success: false, message: "Mã OTP không đúng hoặc đã hết hạn" });
+        }
+
+        res.json({ success: true, message: "Xác thực OTP thành công" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Lỗi xác thực OTP", error: err.message });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        if (!email || !otp || !newPassword) return res.status(400).json({ success: false, message: "Missing fields" });
+
+        const score = calculatePasswordStrength(newPassword);
+        if (score < 70) {
+            return res.status(400).json({
+                success: false,
+                message: "Mật khẩu mới quá yếu. Cần đạt ít nhất 70% mức độ an toàn."
+            });
+        }
+
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        }).select("+resetPasswordOTP +resetPasswordOTPExpires");
+
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        if (user.resetPasswordOTP !== otp || user.resetPasswordOTPExpires < Date.now()) {
+            return res.status(400).json({ success: false, message: "Mã OTP không đúng hoặc đã hết hạn" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.passwordHash = await bcrypt.hash(newPassword, salt);
+
+        // Clear OTP fields
+        user.resetPasswordOTP = undefined;
+        user.resetPasswordOTPExpires = undefined;
+
+        await user.save();
+
+        res.json({ success: true, message: "Đổi mật khẩu thành công" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Lỗi đổi mật khẩu", error: err.message });
+    }
+};

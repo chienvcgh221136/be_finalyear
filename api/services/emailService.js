@@ -375,3 +375,43 @@ exports.sendAppointmentReminderBuyer = async (to, buyerName, sellerName, postTit
         return false;
     }
 };
+
+exports.sendPasswordResetOTP = async (to, userName, otp) => {
+    try {
+        if (!to) return;
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"NhaTot Support" <support@nhatot.com>',
+            to: to,
+            subject: '🔐 Mã xác nhận đặt lại mật khẩu',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+                    <div style="background-color: #2563eb; padding: 30px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Xác thực tài khoản</h1>
+                    </div>
+                    <div style="padding: 30px; color: #374151; line-height: 1.6;">
+                        <p style="font-size: 16px;">Xin chào <strong>${userName}</strong>,</p>
+                        <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Vui lòng sử dụng mã OTP dưới đây để tiếp tục:</p>
+                        
+                        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 25px 0;">
+                            <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">${otp}</span>
+                        </div>
+                        
+                        <p style="margin-bottom: 5px;"><strong>Lưu ý:</strong></p>
+                        <ul style="margin-top: 5px; padding-left: 20px;">
+                            <li>Mã này có hiệu lực trong <strong>5 phút</strong>.</li>
+                            <li>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</li>
+                            <li>Tuyệt đối không chia sẻ mã này cho bất kỳ ai.</li>
+                        </ul>
+                    </div>
+                    <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="color: #6b7280; font-size: 12px; margin: 0;">© 2026 NhaTot App. Tất cả quyền được bảo lưu.</p>
+                    </div>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending password reset email:", error);
+        return false;
+    }
+};
