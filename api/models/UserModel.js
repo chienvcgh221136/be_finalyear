@@ -18,6 +18,7 @@ const UserSchema = new mongoose.Schema(
     avatar: { type: String, default: "" },
     coverImage: { type: String, default: "" },
     violationCount: { type: Number, default: 0 },
+    handledViolations: { type: Number, default: 0 },
     vip: {
       isActive: { type: Boolean, default: false },
       vipType: { type: String, default: "NONE" },

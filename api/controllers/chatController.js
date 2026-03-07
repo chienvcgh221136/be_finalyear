@@ -57,9 +57,7 @@ exports.createOrGetChat = async (req, res) => {
     }
 };
 
-// Get My Chats
-// Get My Chats
-// Get My Chats
+
 exports.getMyChats = async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -137,12 +135,10 @@ exports.getMessages = async (req, res) => {
 
         const messageDoc = await Message.findOne({ chatRoomId });
 
-        if (!messageDoc) {
-            // Return empty structure consistent with MessageData type
+        if (!messageDoc) { 
             return res.json({ success: true, data: { messages: [] } });
         }
 
-        // Filter messages based on deletedAt timestamp for this user
         const deletedAt = chatRoom.deletedAt && chatRoom.deletedAt.get(userId);
         let filteredMessages = messageDoc.messages;
 
@@ -208,24 +204,18 @@ exports.sendMessage = async (req, res) => {
             createdAt: new Date()
         };
 
-        // Push new message to array
         messageDoc.messages.push(newMessage);
         await messageDoc.save();
 
-        // Update ChatRoom lastMessage
-        // Also un-delete the chat for the receiver if they deleted it
         const updateData = {
             lastMessage: type === 'IMAGE' ? '[Hình ảnh]' : content,
             lastMessageAt: new Date()
         };
 
-        // If the sender had previously deleted this chat, their own message makes it reapppear for them too
-        // but starting from this message. Actually, the timestamp logic handles this because lastMessageAt > deletedAt.
-        // However, we want to be explicit if we are using deletedBy too.
         if (chatRoom.deletedBy && chatRoom.deletedBy.includes(receiverId)) {
             updateData.$pull = { deletedBy: receiverId };
         }
-        // If sender is in deletedBy, we should probably pull them too so they see the chat they just messaged in
+        
         if (chatRoom.deletedBy && chatRoom.deletedBy.includes(senderId)) {
             if (!updateData.$pull) updateData.$pull = {};
             updateData.$pull.deletedBy = senderId;
@@ -303,9 +293,6 @@ exports.searchMessages = async (req, res) => {
             { $limit: 20 }
         ]);
 
-        // Populate chat info for context (optional, but finding which chat it belongs to is helpful)
-        // We can do a second query to get chat details if needed, or frontend can map id
-
         res.json({ success: true, results });
 
     } catch (error) {
@@ -314,19 +301,16 @@ exports.searchMessages = async (req, res) => {
     }
 };
 
-// Mark Messages as Read
 exports.markAsRead = async (req, res) => {
     try {
         const { chatRoomId } = req.params;
         const userId = req.user.userId;
 
-        // Find message doc
         const messageDoc = await Message.findOne({ chatRoomId });
         if (!messageDoc) {
             return res.status(404).json({ success: false, message: "Chat not found" });
         }
 
-        // Update all messages where sender is NOT me (i.e. I am reading them) and isRead is false
         let updated = false;
         messageDoc.messages.forEach(msg => {
             if (msg.senderId.toString() !== userId && !msg.isRead) {
@@ -351,7 +335,6 @@ exports.deleteChat = async (req, res) => {
         const { chatRoomId } = req.params;
         const userId = req.user.userId;
 
-        // Check if chat exists and belongs to user
         const chatRoom = await ChatRoom.findOne({
             _id: chatRoomId,
             userIds: userId
@@ -361,7 +344,6 @@ exports.deleteChat = async (req, res) => {
             return res.status(404).json({ success: false, message: "Chat not found or unauthorized" });
         }
 
-        // Initialize deletedAt map if it doesn't exist
         if (!chatRoom.deletedAt) {
             chatRoom.deletedAt = new Map();
         }
@@ -369,7 +351,6 @@ exports.deleteChat = async (req, res) => {
         // Set deletion timestamp for the current user
         chatRoom.deletedAt.set(userId, new Date());
 
-        // Also keep deletedBy for backward compatibility if needed
         if (!chatRoom.deletedBy.includes(userId)) {
             chatRoom.deletedBy.push(userId);
         }

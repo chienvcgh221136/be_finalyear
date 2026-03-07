@@ -59,6 +59,7 @@ app.use("/api/withdraw", withdrawRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/points", require("./api/routes/pointRoutes"));
 app.use("/api/comments", require("./api/routes/commentRoutes"));
+app.use("/api/chatbot", require("./api/routes/chatbotRoutes"));
 
 
 mongoose

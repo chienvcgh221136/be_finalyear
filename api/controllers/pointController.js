@@ -442,7 +442,7 @@ exports.getUsersWithPoints = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const users = await User.find(query)
-            .select('name email phone points role avatar lastLogin createdAt isBanned violationCount')
+            .select('name email phone points role avatar lastLogin createdAt isBanned violationCount handledViolations')
             .sort({ points: sortDir })
             .skip(skip)
             .limit(parseInt(limit));
@@ -465,7 +465,7 @@ exports.getUsersWithPoints = async (req, res) => {
 
 exports.adjustUserPoints = async (req, res) => {
     try {
-        const { userId, amount, description } = req.body;
+        const { userId, amount, description, penaltyLevel } = req.body;
         const adminId = req.user.userId; // Admin performing the action
 
         if (!userId || amount === undefined) {
@@ -475,7 +475,6 @@ exports.adjustUserPoints = async (req, res) => {
 
         const pointAmount = parseInt(amount);
 
-
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -484,6 +483,12 @@ exports.adjustUserPoints = async (req, res) => {
             await exports.addPoints(userId, "ADMIN_ADJUSTMENT", pointAmount, adminId, description || `Admin cộng điểm: +${pointAmount}`);
         } else {
             await exports.spendPoints(userId, Math.abs(pointAmount), "ADMIN_ADJUSTMENT", description || `Admin trừ điểm: -${Math.abs(pointAmount)}`, adminId);
+
+            // If it was a penalty, mark as handled
+            if (penaltyLevel) {
+                user.handledViolations = user.violationCount;
+                await user.save();
+            }
         }
 
         const updatedUser = await User.findById(userId);
@@ -494,12 +499,12 @@ exports.adjustUserPoints = async (req, res) => {
         let notifType = "POINT";
 
         if (pointAmount === 0) {
-            notifType = "SYSTEM"; // Or keep POINT, but SYSTEM feels more like an alert/warning
-            notifMessage = `CẢNH BÁO VI PHẠM: ${description || 'Bạn đã nhận được một cảnh cáo từ quản trị viên.'}`;
+            notifType = "SYSTEM";
+            notifMessage = `[CẢNH BÁO VI PHẠM]: ${description || 'Bạn vừa nhận được một cảnh cáo nhắc nhở từ Quản trị viên.'}`;
         } else if (pointAmount > 0) {
-            notifMessage = `Bạn đã được cộng ${pointAmount.toLocaleString()} điểm. Lý do: ${description || 'Admin điều chỉnh'}.`;
+            notifMessage = `[CỘNG ĐIỂM] ${description || 'Quản trị viên đã thưởng điểm cho bạn.'} (+${pointAmount.toLocaleString()} PTS)`;
         } else {
-            notifMessage = `Bạn bị trừ ${Math.abs(pointAmount).toLocaleString()} điểm. Lý do: ${description || 'Vi phạm quy định'}.`;
+            notifMessage = `[TRỪ ĐIỂM] ${description || 'Khấu trừ điểm do vi phạm quy định.'} (-${Math.abs(pointAmount).toLocaleString()} PTS)`;
         }
 
         await Notification.create({
