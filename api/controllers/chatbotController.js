@@ -1,5 +1,6 @@
 const Post = require("../models/PostModel");
-const geminiService = require("../services/geminiService");
+const VipPackage = require("../models/VipPackageModel");
+const aiService = require("../services/aiService");
 
 const handleQuery = async (req, res) => {
     try {
@@ -8,8 +9,8 @@ const handleQuery = async (req, res) => {
             return res.status(400).json({ message: "Vui lòng cung cấp nội dung tin nhắn." });
         }
 
-        // 1. Extract search parameters using Gemini
-        let searchParams = await geminiService.extractSearchParams(message);
+        // 1. Extract search parameters using Groq
+        let searchParams = await aiService.extractSearchParams(message);
         if (!searchParams || typeof searchParams !== 'object') searchParams = {};
 
         // 2. Build MongoDB query
@@ -58,8 +59,16 @@ const handleQuery = async (req, res) => {
             posts = await Post.find(query).limit(2).lean();
         }
 
-        // 4. Generate AI response based on posts and stats
-        const aiResponse = await geminiService.generateChatResponse(message, posts, stats);
+        // 3. Fetch VIP Packages for context if relevant (or just as general context)
+        const vipPackages = await VipPackage.find({ isActive: true }).lean();
+
+        // 4. Generate AI response based on posts, stats, and VIP packages
+        const combinedContext = {
+            posts: posts,
+            stats: stats,
+            vipPackages: vipPackages
+        };
+        const aiResponse = await aiService.generateChatResponse(message, posts, stats, vipPackages);
 
         return res.status(200).json({
             success: true,
