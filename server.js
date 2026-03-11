@@ -39,6 +39,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Language Middleware
+app.use((req, res, next) => {
+  req.lang = req.query.lang || 'vi';
+  next();
+});
+
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
