@@ -17,14 +17,24 @@ const extractSearchParams = async (userQuery) => {
     - analyticsType: "AVERAGE_PRICE", "POST_COUNT", "AREA_TRENDS" or null
     - city: string (normalized city name)
     - district: string (normalized district name)
-    - transactionType: "RENT" or "SALE"
+    - ward: string (normalized ward name)
+    - street: string (normalized street name)
     - propertyType: "APARTMENT", "HOUSE", "LAND", "OFFICE", "SHOPHOUSE", "ROOM"
+    - transactionType: "RENT" or "SALE"
     - minPrice: number
     - maxPrice: number
 
-    Identify ANALYTICS if the user asks for "giá trung bình", "bao nhiêu tin đăng", "khu vực nào nhiều nhất", v.v.
-    Return null for missing fields. 
-    
+    Rules:
+    - Determine "queryType": "SEARCH", "ANALYTICS", or "GENERAL".
+    - CRITICAL: If the user inputs ONLY a location name (e.g., "bac tu liem", "cầu giấy", "hà nội", "hồ tùng mậu"), ALWAYS classify it as "SEARCH".
+    - Identify ANALYTICS if the user asks for "giá trung bình", "bao nhiêu tin đăng", "khu vực nào nhiều nhất", v.v.
+    - TransactionType Mapping: 
+        - "mua", "bán", "cần tìm mua", "bán nhà", "mua căn hộ" -> "SALE"
+        - "thuê", "cho thuê", "tìm phòng", "thuê nhà", "phòng trọ" -> "RENT"
+    - For short queries like "ho tung mau", "cau giay", "ha noi", "quan 1", extract them into the most specific field (street, district, or city).
+    - IMPORTANT: Always try to return locations with correct Vietnamese accents (e.g. "Hồ Tùng Mậu" instead of "ho tung mau") if recognized.
+    - Set missing fields to null.
+
     Query: "${userQuery}"
     `;
 
@@ -44,7 +54,7 @@ const extractSearchParams = async (userQuery) => {
     }
 };
 
-const generateChatResponse = async (userQuery, posts, stats = null, vipPackages = []) => {
+const generateChatResponse = async (userQuery, posts, stats = null, vipPackages = [], history = []) => {
     let context = "";
 
     if (stats) {
@@ -60,7 +70,8 @@ const generateChatResponse = async (userQuery, posts, stats = null, vipPackages 
             const title = p.title || "Bất động sản";
             const area = p.area || "?";
             const type = p.propertyType || "Chưa rõ";
-            return `- [PROPERTY:${p._id}] ${title} tại ${district} ${city}. Giá: ${price} VNĐ. Diện tích: ${area}m2. Loại: ${type}.`;
+            const prefix = p.isSuggestion ? "[GỢI Ý LÂN CẬN]" : "[KẾT QUẢ CHÍNH XÁC]";
+            return `- ${prefix} [REF:${p._id}] ${title} tại ${district} ${city}. Giá: ${price} VNĐ. Diện tích: ${area}m2. Loại: ${type}.`;
         }).join("\n");
     } else if (!stats && vipPackages.length === 0) {
         context = "Không tìm thấy bất động sản nào phù hợp.";
@@ -76,28 +87,35 @@ const generateChatResponse = async (userQuery, posts, stats = null, vipPackages 
     Bạn là trợ lý ảo chuyên gia về bất động sản của hệ thống này.
     
     NGUYÊN TẮC QUAN TRỌNG:
-    1. CHỈ sử dụng dữ liệu được cung cấp bởi người dùng trong phần context để trả lời. 
-    2. Nếu không có thông tin trong dữ liệu, hãy lịch sự thông báo rằng bạn không tìm thấy kết quả phù hợp trên hệ thống và gợi ý người dùng điều chỉnh yêu cầu.
-    3. KHÔNG được tự ý bịa đặt thông tin hoặc sử dụng kiến thức bên ngoài về các bất động sản khác.
-    4. Trả lời bằng tiếng Việt, thân thiện và chuyên nghiệp.
-    5. Khi giới thiệu bất động sản từ danh sách cung cấp, BẮT BUỘC phải bao gồm tag [PROPERTY:id] (ví dụ: [PROPERTY:65f...] ) của bài đăng đó trong câu trả lời để hệ thống hiển thị card.
-
+    1. CHỈ giới thiệu bất động sản CÓ TRONG context cung cấp. KHÔNG TỰ BỊA ĐẶT.
+    2. ƯU TIÊN KẾT QUẢ CHÍNH XÁC. Nếu là "GỢI Ý LÂN CẬN", hãy thông báo rõ cho người dùng.
+    3. KHÔNG TÌM THẤY: Hãy trả lời CỰC KỲ NGẮN GỌN (dưới 20 từ). Ví dụ: "Rất tiếc, tôi không tìm thấy kết quả phù hợp tại [địa điểm]. Bạn thử tìm khu vực khác nhé?".
+    4. HIỂN THỊ: BẮT BUỘC dùng tag [REF:id] để giới thiệu bất động sản (ví dụ: "[REF:P1]"). Dùng CHÍNH XÁC mã ID (P1, P2...) được cung cấp.
+ 
     DỮ LIỆU HỆ THỐNG:
     ${context}
     `;
 
+    const messages = [
+        { role: "system", content: systemPrompt },
+        ...history.map(h => ({ 
+            role: h.role, 
+            // Sanitize history: Replace any [PROPERTY:...] with [REF:OLD] to prevent AI from seeing hex IDs
+            content: h.content.replace(/\[PROPERTY:\s*[a-fA-F0-9]+\s*\]/g, "[REF:OLD]")
+        })),
+        { role: "user", content: userQuery }
+    ];
+
     try {
         const response = await groq.chat.completions.create({
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userQuery }
-            ],
+            messages: messages,
             model: "llama-3.3-70b-versatile",
-            temperature: 0.7,
+            temperature: 0,
         });
         return response.choices[0].message.content;
     } catch (error) {
-        console.error("Error generating chat response:", error.message);
+        require('fs').appendFileSync('error.log', new Date().toISOString() + ' - ' + (error.stack || error) + '\n');
+        console.error("Error generating chat response:", error.stack || error);
         return "Xin lỗi, tôi gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.";
     }
 };
