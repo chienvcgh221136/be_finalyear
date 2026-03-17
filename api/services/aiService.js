@@ -11,7 +11,7 @@ console.log(`[Groq] Using API Key: ${API_KEY ? API_KEY.substring(0, 10) + '...' 
 
 const extractSearchParams = async (userQuery) => {
     const prompt = `
-    Extract search parameters or analytical intent from the following real estate query in Vietnamese.
+    Extract search parameters or analytical intent from the following real estate query (in Vietnamese or English).
     Return ONLY a JSON object with the following fields:
     - queryType: "SEARCH" (default) or "ANALYTICS" (for stats/avg/count)
     - analyticsType: "AVERAGE_PRICE", "POST_COUNT", "AREA_TRENDS" or null
@@ -27,12 +27,12 @@ const extractSearchParams = async (userQuery) => {
     Rules:
     - Determine "queryType": "SEARCH", "ANALYTICS", or "GENERAL".
     - CRITICAL: If the user inputs ONLY a location name (e.g., "bac tu liem", "cầu giấy", "hà nội", "hồ tùng mậu"), ALWAYS classify it as "SEARCH".
-    - Identify ANALYTICS if the user asks for "giá trung bình", "bao nhiêu tin đăng", "khu vực nào nhiều nhất", v.v.
-    - TransactionType Mapping: 
-        - "mua", "bán", "cần tìm mua", "bán nhà", "mua căn hộ" -> "SALE"
-        - "thuê", "cho thuê", "tìm phòng", "thuê nhà", "phòng trọ" -> "RENT"
+    - Identify ANALYTICS if the user asks for "giá trung bình", "bao nhiêu tin đăng", "khu vực nào nhiều nhất", "average price", "how many", etc.
+    - TransactionType Mapping (Vietnamese & English): 
+        - "mua", "bán", "cần tìm mua", "bán nhà", "mua căn hộ", "buy", "sell", "purchase" -> "SALE"
+        - "thuê", "cho thuê", "tìm phòng", "thuê nhà", "phòng trọ", "rent", "lease" -> "RENT"
     - For short queries like "ho tung mau", "cau giay", "ha noi", "quan 1", extract them into the most specific field (street, district, or city).
-    - IMPORTANT: Always try to return locations with correct Vietnamese accents (e.g. "Hồ Tùng Mậu" instead of "ho tung mau") if recognized.
+    - IMPORTANT: Always try to return locations with correct Vietnamese accents (e.g. "Hồ Tùng Mậu" instead of "ho tung mau") if recognized, even if queried in English.
     - Set missing fields to null.
 
     Query: "${userQuery}"
@@ -58,41 +58,46 @@ const generateChatResponse = async (userQuery, posts, stats = null, vipPackages 
     let context = "";
 
     if (stats) {
-        context = `THÔNG KÊ HỆ THỐNG:\n${JSON.stringify(stats, null, 2)}\n\n`;
+        context = `SYSTEM STATISTICS:\n${JSON.stringify(stats, null, 2)}\n\n`;
     }
 
     if (posts && posts.length > 0) {
-        context += "DANH SÁCH BẤT ĐỘNG SẢN PHÙ HỢP:\n" + posts.map(p => {
+        context += "AVAILABLE PROPERTIES:\n" + posts.map(p => {
             const addr = p.address || {};
-            const district = addr.district || "không rõ";
+            const district = addr.district || "Unknown";
             const city = addr.city || "";
-            const price = p.price ? p.price.toLocaleString() : "Liên hệ";
-            const title = p.title || "Bất động sản";
+            const price = p.price ? p.price.toLocaleString() : "Contact";
+            const title = p.title || "Property";
             const area = p.area || "?";
-            const type = p.propertyType || "Chưa rõ";
-            const prefix = p.isSuggestion ? "[GỢI Ý LÂN CẬN]" : "[KẾT QUẢ CHÍNH XÁC]";
-            return `- ${prefix} [REF:${p._id}] ${title} tại ${district} ${city}. Giá: ${price} VNĐ. Diện tích: ${area}m2. Loại: ${type}.`;
+            const type = p.propertyType || "Unknown";
+            const prefix = p.isSuggestion ? "[NEARBY SUGGESTION]" : "[EXACT MATCH]";
+            return `- ${prefix} [REF:${p._id}] Title: ${title} | Location: ${district}, ${city} | Price: ${price} VND | Area: ${area}m2 | Type: ${type}`;
         }).join("\n");
     } else if (!stats && vipPackages.length === 0) {
-        context = "Không tìm thấy bất động sản nào phù hợp.";
+        context = "No matching properties found.";
     }
 
     if (vipPackages && vipPackages.length > 0) {
-        context += "\n\nCÁC GÓI DỊCH VỤ VIP:\n" + vipPackages.map(pkg => {
-            return `- Gói ${pkg.name}: Giá ${pkg.price.toLocaleString()} VNĐ/${pkg.durationDays} ngày. Quyền lợi: ${pkg.perks.join(", ")}.`;
+        context += "\n\nVIP PACKAGES:\n" + vipPackages.map(pkg => {
+            return `- Package ${pkg.name}: Price ${pkg.price.toLocaleString()} VND / ${pkg.durationDays} days. Perks: ${pkg.perks.join(", ")}.`;
         }).join("\n");
     }
 
     const systemPrompt = `
-    Bạn là trợ lý ảo chuyên gia về bất động sản của hệ thống này.
+    You are a professional real estate AI assistant for this system.
     
-    NGUYÊN TẮC QUAN TRỌNG:
-    1. CHỈ giới thiệu bất động sản CÓ TRONG context cung cấp. KHÔNG TỰ BỊA ĐẶT.
-    2. ƯU TIÊN KẾT QUẢ CHÍNH XÁC. Nếu là "GỢI Ý LÂN CẬN", hãy thông báo rõ cho người dùng.
-    3. KHÔNG TÌM THẤY: Hãy trả lời CỰC KỲ NGẮN GỌN (dưới 20 từ). Ví dụ: "Rất tiếc, tôi không tìm thấy kết quả phù hợp tại [địa điểm]. Bạn thử tìm khu vực khác nhé?".
-    4. HIỂN THỊ: BẮT BUỘC dùng tag [REF:id] để giới thiệu bất động sản (ví dụ: "[REF:P1]"). Dùng CHÍNH XÁC mã ID (P1, P2...) được cung cấp.
+    CRITICAL RULES:
+    1. LANGUAGE MATCHING (CRITICAL): You MUST detect the language of the user's input and reply ENTIRELY in that same language.
+       - If the user writes in English (e.g., "find to me rent house", "hello", "apartment"), you MUST reply ENTIRELY in English. *IMPORTANT*: You MUST TRANSLATE the property details, address, and specifications from the SYSTEM DATA CONTEXT (which is in Vietnamese) into English before presenting them. (e.g., translate "Giá", "Diện tích", "Loại", "tại", "mặt tiền" to "Price", "Area", "Type", "at", "frontage", etc.)
+       - If the user writes in Vietnamese (e.g., "cho thuê nhà", "chào"), you MUST reply ENTIRELY in Vietnamese.
+    2. GREETINGS: If the user only says a greeting, greet them back in their language and politely ask how you can help them find real estate today.
+    3. ACCURACY: ONLY introduce properties provided in the SYSTEM DATA CONTEXT. DO NOT invent properties or information.
+    4. SUGGESTIONS: Prioritize exact matches. If suggesting nearby properties, clearly inform the user.
+    5. NOT FOUND: If no properties are found, reply VERY BRIEFLY (under 20 words) in the user's language (e.g., "Sorry, I couldn't find any matching properties." or "Rất tiếc, tôi không tìm thấy kết quả phù hợp.").
+    6. FORMATTING: You MUST use the tag [REF:id] to reference a property (e.g., "[REF:P1]"). Use EXACTLY the ID provided in the dataset.
+    7. OUT OF SCOPE: If the user asks about topics completely unrelated to real estate or this website, politely decline to answer in the user's language.
  
-    DỮ LIỆU HỆ THỐNG:
+    SYSTEM DATA CONTEXT:
     ${context}
     `;
 
