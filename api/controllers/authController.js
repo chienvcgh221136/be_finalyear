@@ -358,7 +358,8 @@ exports.forgotPasswordSendOTP = async (req, res) => {
         await user.save();
 
         const emailService = require("../services/emailService");
-        await emailService.sendPasswordResetOTP(user.email, user.name, otp);
+        const reqLang = req.headers['accept-language']?.substring(0, 2) || user.language || 'vi';
+        await emailService.sendPasswordResetOTP(user.email, user.name, otp, reqLang);
 
         res.json({ success: true, message: "Mã OTP đã được gửi đến email của bạn" });
     } catch (err) {

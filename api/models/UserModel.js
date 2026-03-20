@@ -13,6 +13,7 @@ const UserSchema = new mongoose.Schema(
     refreshToken: String,
     isVerified: { type: Boolean, default: false },
     isBanned: { type: Boolean, default: false },
+    language: { type: String, default: "vi", enum: ["vi", "en"] },
     rating: { type: Number, default: 0, min: 0, max: 5 },
     totalReviews: { type: Number, default: 0 },
     avatar: { type: String, default: "" },

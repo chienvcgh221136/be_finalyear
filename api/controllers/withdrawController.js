@@ -31,7 +31,7 @@ exports.initiateWithdraw = async (req, res) => {
 
         // Send OTP Email
         if (emailService.sendWithdrawOTP) {
-            await emailService.sendWithdrawOTP(user.email, user.name, otp, amount);
+            await emailService.sendWithdrawOTP(user.email, user.name, otp, amount, user.language || 'vi');
         } else {
             // Fallback if not configured properly
             console.log(`[DEV] OTP for ${user.email}: ${otp}`);
@@ -97,7 +97,7 @@ exports.verifyWithdraw = async (req, res) => {
         console.log("--- START ADMIN NOTIFICATION SEQUENCE ---");
         if (emailService.sendAdminWithdrawNotification) {
             console.log("Calling emailService.sendAdminWithdrawNotification...");
-            await emailService.sendAdminWithdrawNotification(user.name, amount, request._id);
+            await emailService.sendAdminWithdrawNotification(user.name, amount, request._id, user.language || 'vi');
             console.log("Call to emailService completed.");
         } else {
             console.error("emailService.sendAdminWithdrawNotification is NOT defined!");
@@ -222,7 +222,7 @@ exports.updateWithdrawStatus = async (req, res) => {
 
         // Notify User
         if (emailService.sendWithdrawStatusUpdate) {
-            await emailService.sendWithdrawStatusUpdate(request.userId.email, request.userId.name, status, request.amount, adminNote);
+            await emailService.sendWithdrawStatusUpdate(request.userId.email, request.userId.name, status, request.amount, adminNote, request.userId.language || 'vi');
         }
 
         res.json({ success: true, request });

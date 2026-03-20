@@ -185,7 +185,7 @@ exports.sepayWebhook = async (req, res) => {
 
         // Send Email Notification
         if (user && user.email) {
-            emailService.sendTopupSuccessEmail(user.email, user.name, amount, wallet.balance)
+            emailService.sendTopupSuccessEmail(user.email, user.name, amount, wallet.balance, user.language || 'vi')
                 .catch(err => console.error("Failed to send email:", err));
         }
 

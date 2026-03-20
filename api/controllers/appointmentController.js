@@ -9,7 +9,7 @@ exports.createAppointment = async (req, res) => {
     try {
         const { appointmentTime, note } = req.body;
         // Populate seller to get email
-        const post = await Post.findById(req.params.postId).populate("userId", "name email");
+        const post = await Post.findById(req.params.postId).populate("userId", "name email language");
         if (!post) return res.status(404).json({ success: false, message: "Post not found" });
 
         // Populate buyer (current user) to get fields
@@ -27,10 +27,10 @@ exports.createAppointment = async (req, res) => {
         });
 
         // Send Email to Sender (Buyer)
-        emailService.sendAppointmentRequestSender(buyer.email, buyer.name, post.title, appointmentTime);
+        emailService.sendAppointmentRequestSender(buyer.email, buyer.name, post.title, appointmentTime, buyer.language || 'vi');
 
         // Send Email to Receiver (Seller)
-        emailService.sendAppointmentRequestReceiver(post.userId.email, post.userId.name, buyer.name, post.title, appointmentTime, note);
+        emailService.sendAppointmentRequestReceiver(post.userId.email, post.userId.name, buyer.name, post.title, appointmentTime, note, post.userId.language || 'vi');
 
         // Notify Seller
         const NotificationController = require("./notificationController");
@@ -50,7 +50,7 @@ exports.updateStatus = async (req, res) => {
     try {
         // Populate buyer to send status update email
         const ap = await Appointment.findById(req.params.id)
-            .populate("buyerId", "name email")
+            .populate("buyerId", "name email language")
             .populate("postId", "title");
 
         if (!ap) return res.status(404).json({ success: false, message: "Not found" });
@@ -62,7 +62,7 @@ exports.updateStatus = async (req, res) => {
 
         // Send Email to Buyer
         if (ap.buyerId && ap.buyerId.email) {
-            emailService.sendAppointmentStatusUpdate(ap.buyerId.email, ap.buyerId.name, ap.postId.title, ap.status, ap.appointmentTime);
+            emailService.sendAppointmentStatusUpdate(ap.buyerId.email, ap.buyerId.name, ap.postId.title, ap.status, ap.appointmentTime, ap.buyerId.language || 'vi');
         }
 
         // Notify Buyer

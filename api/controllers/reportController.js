@@ -178,7 +178,8 @@ exports.resolveReport = async (req, res) => {
             owner.email,
             owner.name,
             report.reason,
-            report.description
+            report.description,
+            owner.language || 'vi'
           );
         } else {
           await emailService.sendViolationWarning(
@@ -186,7 +187,8 @@ exports.resolveReport = async (req, res) => {
             owner.name,
             report.postId ? report.postId.title : 'Bài đăng',
             report.reason,
-            report.description
+            report.description,
+            owner.language || 'vi'
           );
         }
       } catch (emailError) {
