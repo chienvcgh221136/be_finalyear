@@ -138,6 +138,12 @@ const handleQuery = async (req, res) => {
                 if (searchParams.transactionType) {
                     fallbackQuery.transactionType = searchParams.transactionType;
                 }
+                
+                if (searchParams.minPrice || searchParams.maxPrice) {
+                    fallbackQuery.price = {};
+                    if (searchParams.minPrice) fallbackQuery.price.$gte = searchParams.minPrice;
+                    if (searchParams.maxPrice) fallbackQuery.price.$lte = searchParams.maxPrice;
+                }
 
                 posts = await Post.find(fallbackQuery)
                     .limit(5)
@@ -180,12 +186,12 @@ const handleQuery = async (req, res) => {
 
         // 7. REVERSE MAPPING: Replace [REF:P1] with [PROPERTY:realId]
         idMap.forEach((realId, alias) => {
-            const aliasRegex = new RegExp(`\\[REF:${alias}\\]`, 'g');
+            const aliasRegex = new RegExp(`\\[REF:\\s*${alias}\\s*\\]`, 'gi');
             aiResponse = aiResponse.replace(aliasRegex, `[PROPERTY:${realId}]`);
         });
 
         // Final cleanup of any lingering [REF:] tags just in case
-        aiResponse = aiResponse.replace(/\[REF:[^\]]+\]/g, "");
+        aiResponse = aiResponse.replace(/\[REF:\s*[^\]]+\s*\]/gi, "");
 
         // 8. Save to history
         if (req.user && req.user.userId) {

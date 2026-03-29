@@ -21,8 +21,8 @@ const extractSearchParams = async (userQuery) => {
     - street: string (normalized street name)
     - propertyType: "APARTMENT", "HOUSE", "LAND", "OFFICE", "SHOPHOUSE", "ROOM"
     - transactionType: "RENT" or "SALE"
-    - minPrice: number
-    - maxPrice: number
+    - minPrice: number (MUST BE IN FULL VND. Example: 10 triệu = 10000000, 1.5 tỷ = 1500000000)
+    - maxPrice: number (MUST BE IN FULL VND. Example: 10 triệu = 10000000, 1.5 tỷ = 1500000000)
 
     Rules:
     - Determine "queryType": "SEARCH", "ANALYTICS", or "GENERAL".
@@ -34,6 +34,10 @@ const extractSearchParams = async (userQuery) => {
     - For short queries like "ho tung mau", "cau giay", "ha noi", "quan 1", extract them into the most specific field (street, district, or city).
     - IMPORTANT: Always try to return locations with correct Vietnamese accents (e.g. "Hồ Tùng Mậu" instead of "ho tung mau") if recognized, even if queried in English.
     - Set missing fields to null.
+
+    CRITICAL NOTE ON PRICES: Users often say "triệu" (million), "tỷ" (billion). 
+    If they say "dưới 10 triệu", maxPrice MUST be 10000000. 
+    If they say "trên 1 tỷ", minPrice MUST be 1000000000.
 
     Query: "${userQuery}"
     `;
@@ -96,6 +100,7 @@ const generateChatResponse = async (userQuery, posts, stats = null, vipPackages 
     5. NOT FOUND: If no properties are found, reply VERY BRIEFLY (under 20 words) in the user's language (e.g., "Sorry, I couldn't find any matching properties." or "Rất tiếc, tôi không tìm thấy kết quả phù hợp.").
     6. FORMATTING: You MUST use the tag [REF:id] to reference a property (e.g., "[REF:P1]"). Use EXACTLY the ID provided in the dataset.
     7. OUT OF SCOPE: If the user asks about topics completely unrelated to real estate or this website, politely decline to answer in the user's language.
+    8. CURRENCY AND LOGIC (CRITICAL): Always show prices in VND as provided in the SYSTEM DATA CONTEXT (e.g., "triệu", "tỷ", "VNĐ"). DO NOT include USD conversions. Remember that 1 triệu = 1,000,000 and 1 tỷ = 1,000,000,000. When comparing prices (like 7,500,000 < 10,000,000), do the math carefully so you do not falsely claim a lower price exceeds their budget!
  
     SYSTEM DATA CONTEXT:
     ${context}
