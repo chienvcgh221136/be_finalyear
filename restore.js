@@ -1,0 +1,1 @@
+require('dotenv').config(); const mongoose = require('mongoose'); mongoose.connect(process.env.MONGO_URI).then(async () => { const Post = require('./api/models/PostModel'); const result = await Post.updateMany({ status: 'REMOVED' }, { status: 'ACTIVE' }); console.log('Restored posts:', result.modifiedCount); process.exit(); }).catch(e => { console.error(e); process.exit(1); });

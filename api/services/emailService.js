@@ -553,3 +553,104 @@ exports.sendPasswordResetOTP = async (to, userName, otp, lang = 'vi') => {
         return false;
     }
 };
+
+exports.sendBanEmail = async (to, userName, reason, lang = 'vi') => {
+    try {
+        if (!to) return;
+        const isEn = lang === 'en';
+
+        const subject = isEn ? '⛔ Account Banned Notification' : '⛔ Thông báo khóa tài khoản vĩnh viễn';
+        const header = isEn ? 'Account Banned' : 'Tài khoản đã bị khóa';
+        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
+        const content = isEn 
+            ? `Your account on EstateMarket has been <strong>permanently banned</strong> due to multiple or severe violations of our community standards.` 
+            : `Tài khoản của bạn trên EstateMarket đã bị <strong>khóa vĩnh viễn</strong> do vi phạm nghiêm trọng hoặc lặp lại nhiều lần các quy định cộng đồng.`;
+        const reasonLabel = isEn ? `Reason for ban:` : `Lý do khóa:`;
+        const actionText = isEn 
+            ? `As a result, you can no longer log in, and all your active posts have been removed from the platform.` 
+            : `Hệ thống đã từ chối quyền truy cập của bạn, đồng thời toàn bộ tin đăng đang hoạt động của bạn đã bị gỡ khỏi nền tảng.`;
+        const appealText = isEn 
+            ? `If you believe this is a mistake, please contact our support team.` 
+            : `Nếu bạn cho rằng đây là một sự nhầm lẫn, vui lòng liên hệ với đội ngũ hỗ trợ của chúng tôi.`;
+        const footerText = isEn ? `EstateMarket Security Team` : `Đội ngũ an ninh EstateMarket`;
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"EstateMarket Security" <security@estatemarket.com>',
+            to: to,
+            subject: subject,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                    <div style="background-color: #000000; padding: 30px; text-align: center;">
+                        <h2 style="color: white; margin: 0; letter-spacing: 2px;">${header.toUpperCase()}</h2>
+                    </div>
+                    <div style="padding: 30px; background-color: #ffffff;">
+                        <p style="font-size: 16px;">${greeting}</p>
+                        <p style="line-height: 1.6; color: #374151;">${content}</p>
+                        
+                        <div style="background-color: #f9fafb; border-left: 4px solid #000000; padding: 20px; margin: 25px 0;">
+                            <p style="margin: 0; font-weight: bold; color: #111827;">${reasonLabel}</p>
+                            <p style="margin: 10px 0 0; color: #4b5563; font-style: italic;">"${reason || (isEn ? 'Violation of terms of service' : 'Vi phạm điều khoản dịch vụ')}"</p>
+                        </div>
+
+                        <p style="color: #ef4444; font-weight: bold;">${actionText}</p>
+                        <p style="font-size: 14px; margin-top: 25px; color: #6b7280;">${appealText}</p>
+                    </div>
+                    <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="color: #9ca3af; font-size: 12px; margin: 0;">${footerText}</p>
+                    </div>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending ban email:", error);
+        return false;
+    }
+};
+
+exports.sendUnbanEmail = async (to, userName, lang = 'vi') => {
+    try {
+        if (!to) return;
+        const isEn = lang === 'en';
+
+        const subject = isEn ? '✅ Account Restored Notification' : '✅ Thông báo khôi phục tài khoản';
+        const header = isEn ? 'Account Restored' : 'Tài khoản đã được mở khóa';
+        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
+        const content = isEn 
+            ? `Good news! Your EstateMarket account has been <strong>restored</strong>. You can now log in and use all features of our platform again.` 
+            : `Tin vui! Tài khoản EstateMarket của bạn đã được <strong>khôi phục</strong>. Bây giờ bạn có thể đăng nhập và tiếp tục sử dụng tất cả các tính năng của hệ thống.`;
+        const welcomeBack = isEn ? `Welcome back to our community!` : `Chào mừng bạn quay trở lại với cộng đồng!`;
+        const btnText = isEn ? `Login Now` : `Đăng nhập ngay`;
+        const footerText = isEn ? `EstateMarket Support Team` : `Đội ngũ hỗ trợ EstateMarket`;
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
+            to: to,
+            subject: subject,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                    <div style="background-color: #16a34a; padding: 30px; text-align: center;">
+                        <h2 style="color: white; margin: 0;">${header}</h2>
+                    </div>
+                    <div style="padding: 30px; background-color: #ffffff; text-align: center;">
+                        <p style="font-size: 16px; text-align: left;">${greeting}</p>
+                        <p style="line-height: 1.6; color: #374151; text-align: left;">${content}</p>
+                        
+                        <p style="font-weight: bold; color: #16a34a; margin: 25px 0;">${welcomeBack}</p>
+                        
+                        <div style="margin-top: 30px;">
+                            <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login" style="display: inline-block; background-color: #16a34a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; transition: background-color 0.3s;">${btnText}</a>
+                        </div>
+                    </div>
+                    <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="color: #9ca3af; font-size: 12px; margin: 0;">${footerText}</p>
+                    </div>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending unban email:", error);
+        return false;
+    }
+};

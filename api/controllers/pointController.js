@@ -1,7 +1,8 @@
 const User = require("../models/UserModel");
 const PointLog = require("../models/PointLogModel");
 const VipPackage = require("../models/VipPackageModel");
-
+const Post = require("../models/PostModel");
+const emailService = require("../services/emailService");
 const Notification = require("../models/NotificationModel");
 
 // Constants for Reward Costs
@@ -487,6 +488,45 @@ exports.adjustUserPoints = async (req, res) => {
             // If it was a penalty, mark as handled
             if (penaltyLevel) {
                 user.handledViolations = user.violationCount;
+
+                // Handle Level 5: BAN
+                if (penaltyLevel === 5) {
+                    user.isBanned = true;
+
+                    // Remove all posts
+                    await Post.updateMany(
+                        { userId: user._id },
+                        { status: "REMOVED" }
+                    );
+
+                    // Send Ban Email
+                    const lang = user.language || 'vi';
+
+                    // Simple server-side translation map for known penalty reasons
+                    const translations = {
+                        vi: {
+                            "admin.points.adjustment_reasons.violation_warning": "Nhắc nhở vi phạm",
+                            "admin.points.adjustment_reasons.violation_deduct_15": "Tái phạm lần 2: Trừ 15% tổng điểm",
+                            "admin.points.adjustment_reasons.violation_deduct_30": "Tái phạm lần 3: Trừ 30% tổng điểm",
+                            "admin.points.adjustment_reasons.violation_deduct_50": "Vi phạm nghiêm trọng: Trừ 50% tổng điểm",
+                            "admin.points.adjustment_reasons.violation_ban": "Mức phạt tối đa: Tịch thu toàn bộ điểm & Khóa tài khoản"
+                        },
+                        en: {
+                            "admin.points.adjustment_reasons.violation_warning": "Violation reminder",
+                            "admin.points.adjustment_reasons.violation_deduct_15": "Repeat violation 2: Deduct 15% total points",
+                            "admin.points.adjustment_reasons.violation_deduct_30": "Repeat violation 3: Deduct 30% total points",
+                            "admin.points.adjustment_reasons.violation_deduct_50": "Serious violation: Deduct 50% total points",
+                            "admin.points.adjustment_reasons.violation_ban": "Maximum penalty: Forfeit all points & Permanent ban"
+                        }
+                    };
+
+                    const translatedReason = (translations[lang] && translations[lang][description])
+                        || description
+                        || (lang === 'en' ? "Community standards violation" : "Vi phạm quy hoạch hệ thống");
+
+                    await emailService.sendBanEmail(user.email, user.name, translatedReason, lang);
+                }
+
                 await user.save();
             }
         }

@@ -1,5 +1,6 @@
 const User = require("../models/UserModel");
 const Post = require("../models/PostModel");
+const emailService = require("../services/emailService");
 
 exports.banUser = async (req, res) => {
     try {
@@ -21,6 +22,12 @@ exports.banUser = async (req, res) => {
             success: true,
             message: "User banned and all posts removed"
         });
+
+        // Send Email Notification
+        const lang = user.language || 'vi';
+        const reason = "Vi phạm quy định hệ thống / Community standards violation";
+        await emailService.sendBanEmail(user.email, user.name, reason, lang);
+
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -38,6 +45,11 @@ exports.unbanUser = async (req, res) => {
             success: true,
             message: "User unbanned"
         });
+
+        // Send Email Notification
+        const lang = user.language || 'vi';
+        await emailService.sendUnbanEmail(user.email, user.name, lang);
+
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

@@ -1,0 +1,1 @@
+const mongoose = require('mongoose'); mongoose.connect('mongodb+srv://d190204:d190204@mydbcluster.6kuho.mongodb.net/BDS').then(async () => { const Post = require('./api/models/PostModel'); const count = await Post.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]); console.log(count); process.exit(); });
