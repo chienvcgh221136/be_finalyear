@@ -1,7 +1,0 @@
-2026-03-12T18:58:33.924Z - Error: 429 {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kk6mg253edqv8a2z2qzkbset` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99625, Requested 464. Please try again in 1m16.896s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
-    at APIError.generate (D:\final_project - main\server\node_modules\groq-sdk\error.js:58:20)
-    at Groq.makeStatusError (D:\final_project - main\server\node_modules\groq-sdk\core.js:293:33)
-    at Groq.makeRequest (D:\final_project - main\server\node_modules\groq-sdk\core.js:339:30)
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async Object.generateChatResponse (D:\final_project - main\server\api\services\aiService.js:110:26)
-    at async handleQuery (D:\final_project - main\server\api\controllers\chatbotController.js:179:26)

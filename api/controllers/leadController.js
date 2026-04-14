@@ -53,6 +53,7 @@ exports.showPhone = async (req, res) => {
             // Ưu tiên dùng BONUS trước
             if ((currentUser.vip.bonusLeadCredits || 0) > 0) {
                 currentUser.vip.bonusLeadCredits -= 1;
+                usedBonus = true;
                 await currentUser.save();
             }
             // Nếu KHÔNG CÓ bonus mới kiểm tra LIMIT của gói VIP

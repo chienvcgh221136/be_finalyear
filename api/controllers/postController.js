@@ -105,8 +105,6 @@ exports.getSuggestions = async (req, res) => {
 
         const searchRegex = { $regex: q, $options: 'i' };
 
-        // We use collation to achieve accent-insensitive search if supported by the environment
-        // strength: 1 means ignore case and diacritics
         const suggestions = await Post.find({
             status: 'ACTIVE',
             $or: [

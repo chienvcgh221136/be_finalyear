@@ -19,10 +19,6 @@ exports.createPackage = async (req, res) => {
     }
 };
 
-// =======================
-// VIP UPGRADE LOGIC
-// =======================
-
 exports.getUpgradeInfo = async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -42,14 +38,7 @@ exports.getUpgradeInfo = async (req, res) => {
             return res.status(400).json({ message: "Remaining time is less than 1 day. Cannot upgrade." });
         }
 
-        // Calculate Residual Value of Current Package
-        // Formula: (Price / 30) * remainingDays
-        // We assume '30' is the standard divisor from the user spec, or we can use durationDays.
-        // User spec says: (Giá gói cũ ÷ 30 ngày) * Số ngày còn lại.
-        // Let's use 30 as per spec, or Math.max(currentPackage.durationDays, 1) if we want to be data-driven.
-        // Given spec example: BASIC $99/30 days. So divisior is durationDays.
         const durationDivisor = currentPackage.durationDays || 30;
-
         const dailyValue = currentPackage.price / durationDivisor;
         const residualValue = Math.floor(dailyValue * remainingDays);
 
@@ -132,9 +121,7 @@ exports.upgradeVip = async (req, res) => {
             return res.status(400).json({ message: "Insufficient balance." });
         }
 
-        // --- EXECUTE TRANSACTION ---
-
-        // 1. Deduct Money
+     
         wallet.balance -= upgradeCost;
         wallet.totalSpent += upgradeCost;
         await wallet.save();
@@ -154,7 +141,7 @@ exports.upgradeVip = async (req, res) => {
         user.vip.vipType = targetPackage.name;
         user.vip.packageId = targetPackage._id;
         user.vip.priorityScore = targetPackage.priorityScore;
-        // user.vip.dailyUsedSlots: assuming limit increases, but usage remains same.
+
 
         await user.save();
 

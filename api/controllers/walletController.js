@@ -100,15 +100,13 @@ exports.sepayWebhook = async (req, res) => {
         console.log("Headers:", req.headers);
         console.log("Body:", JSON.stringify(req.body, null, 2));
 
-        // Sepay sends data in req.body. content usually contains the transaction description
+
         const { gateway, transactionDate, accountProvided, referenceCode, transferAmount, content, transferType, transferContent } = req.body;
 
-        // Check if this is an incoming transfer (credit)
-        // transferAmount is usually a number or string
+
         const amount = Number(transferAmount);
 
-        // Extract User ID from content (transferContent)
-        // Pattern: NAPTIEN <USER_ID>
+
         const description = content || transferContent || "";
         console.log("Analyzing description:", description);
 
@@ -131,14 +129,8 @@ exports.sepayWebhook = async (req, res) => {
         }
         console.log("Current Balance:", wallet.balance);
 
-        // Check duplicate transaction by referenceCode (Sepay sends unique referenceCode for each bank txn)
-        // Optionally store referenceCode in Transaction to prevent duplicates
         const existingTxn = await Transaction.findOne({ description: { $regex: referenceCode, $options: 'i' } });
-        // Note: Better to add a 'refId' or 'paymentId' field to Transaction model for strict checking. 
-        // For now, checking description or trusting Sepay won't retry too often if we respond 200.
-        // Let's rely on Sepay's guarantees or simple duplicate check if we had a field. 
 
-        // Update Wallet
         const isFirstTopup = wallet.totalTopup === 0;
 
         wallet.balance += amount;
