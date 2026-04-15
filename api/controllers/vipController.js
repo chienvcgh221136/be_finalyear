@@ -337,6 +337,7 @@ exports.getMyVip = async (req, res) => {
         const todayViewedPhones = await Lead.countDocuments({
             buyerId: req.user.userId,
             type: "SHOW_PHONE",
+            isBonus: false,
             createdAt: { $gte: startOfDay }
         });
 
