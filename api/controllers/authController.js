@@ -113,18 +113,24 @@ exports.login = async (req, res) => {
         user.refreshToken = refreshToken;
         await user.save();
 
-        // Set Cookies
-        res.cookie('accessToken', accessToken, {
+        // Define shared cookie options
+        const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            secure: true, // Always true for cross-domain HTTPS (Render/Vercel)
+            sameSite: 'none',
             maxAge: 1 * 24 * 60 * 60 * 1000 // 1 day
-        });
+        };
+
+        // If in development (localhost), use more relaxed settings
+        if (process.env.NODE_ENV !== 'production') {
+            cookieOptions.secure = false;
+            cookieOptions.sameSite = 'lax';
+        }
+
+        res.cookie('accessToken', accessToken, cookieOptions);
 
         res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            ...cookieOptions,
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
@@ -188,12 +194,19 @@ exports.refreshToken = async (req, res) => {
             { expiresIn: "1d" }
         );
 
-        res.cookie('accessToken', newAccessToken, {
+        const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            secure: true,
+            sameSite: 'none',
             maxAge: 1 * 24 * 60 * 60 * 1000
-        });
+        };
+
+        if (process.env.NODE_ENV !== 'production') {
+            cookieOptions.secure = false;
+            cookieOptions.sameSite = 'lax';
+        }
+
+        res.cookie('accessToken', newAccessToken, cookieOptions);
 
         res.json({ success: true, accessToken: newAccessToken });
     } catch (err) {
@@ -207,8 +220,18 @@ exports.logout = async (req, res) => {
         // Optional: clear from DB if needed
     }
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    const cookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none'
+    };
+    if (process.env.NODE_ENV !== 'production') {
+        cookieOptions.secure = false;
+        cookieOptions.sameSite = 'lax';
+    }
+
+    res.clearCookie('accessToken', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
     res.json({ success: true, message: "Logged out successfully" });
 };
 
@@ -268,17 +291,22 @@ exports.googleLogin = async (req, res) => {
         user.refreshToken = refreshToken;
         await user.save();
 
-        res.cookie('accessToken', accessToken, {
+        const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            secure: true,
+            sameSite: 'none',
             maxAge: 1 * 24 * 60 * 60 * 1000
-        });
+        };
+
+        if (process.env.NODE_ENV !== 'production') {
+            cookieOptions.secure = false;
+            cookieOptions.sameSite = 'lax';
+        }
+
+        res.cookie('accessToken', accessToken, cookieOptions);
 
         res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            ...cookieOptions,
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
