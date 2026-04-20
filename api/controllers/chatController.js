@@ -2,7 +2,6 @@ const ChatRoom = require("../models/ChatRoomModel");
 const Message = require("../models/MessageModel");
 const User = require("../models/UserModel");
 
-// Create or Get Chat Room
 exports.createOrGetChat = async (req, res) => {
     try {
         const { postId, sellerId } = req.body;
@@ -25,7 +24,6 @@ exports.createOrGetChat = async (req, res) => {
         if (chatRoom) {
             // Chat exists, update the context (postId) to the new post
             chatRoom.postId = postId;
-            chatRoom.lastMessageAt = Date.now(); // Optional: bump time or just keep
 
             // If the user had previously deleted this chat, un-delete it
             if (chatRoom.deletedBy && chatRoom.deletedBy.includes(buyerId)) {
@@ -61,7 +59,6 @@ exports.createOrGetChat = async (req, res) => {
 exports.getMyChats = async (req, res) => {
     try {
         const userId = req.user.userId;
-        console.log("getMyChats request for userId:", userId);
 
         // Fetch all rooms user is part of
         const allChats = await ChatRoom.find({
@@ -113,7 +110,6 @@ exports.getMyChats = async (req, res) => {
             return { ...chat, unreadCount, blockedByOther };
         });
 
-        console.log(`Found ${chatsWithUnread.length} visible chats for user ${userId} (from ${allChats.length} total)`);
 
         res.json({ success: true, chats: chatsWithUnread });
     } catch (error) {
@@ -122,7 +118,6 @@ exports.getMyChats = async (req, res) => {
     }
 };
 
-// Get Messages
 exports.getMessages = async (req, res) => {
     try {
         const { chatRoomId } = req.params;
@@ -155,11 +150,10 @@ exports.getMessages = async (req, res) => {
     }
 };
 
-// Send Message
 exports.sendMessage = async (req, res) => {
     try {
         const { chatRoomId } = req.params;
-        const { content, type = "TEXT" } = req.body; // Accept type
+        const { content, type = "TEXT" } = req.body;
         const senderId = req.user.userId;
 
         if (!content) {
@@ -171,29 +165,33 @@ exports.sendMessage = async (req, res) => {
             return res.status(404).json({ success: false, message: "Chat room not found" });
         }
 
-        // Check for blocked users
         const receiverId = chatRoom.userIds.find(id => id.toString() !== senderId);
 
-        // Check if sender has blocked receiver OR receiver has blocked sender
-        const sender = await User.findById(senderId);
-        const receiver = await User.findById(receiverId);
+        // Fetch users in parallel
+        const [sender, receiver] = await Promise.all([
+            User.findById(senderId),
+            User.findById(receiverId)
+        ]);
 
-        if (sender.blockedUsers && sender.blockedUsers.includes(receiverId)) {
-            return res.status(403).json({ success: false, message: "You have blocked this user. Unblock to send message." });
+        if (!sender) {
+            return res.status(404).json({ success: false, message: "Sender not found" });
         }
 
-        if (receiver.blockedUsers && receiver.blockedUsers.includes(senderId)) {
-            return res.status(403).json({ success: false, message: "You identify as blocked by this user." });
+        // Check blocking with string conversion for reliability
+        const senderBlockedOthers = sender.blockedUsers?.some(id => id.toString() === receiverId?.toString());
+        if (senderBlockedOthers) {
+            return res.status(403).json({ success: false, message: "Bạn đã chặn người dùng này. Hãy bỏ chặn để gửi tin nhắn." });
         }
 
+        const receiverBlockedSender = receiver?.blockedUsers?.some(id => id.toString() === senderId.toString());
+        if (receiverBlockedSender) {
+            return res.status(403).json({ success: false, message: "Bạn không thể gửi tin nhắn cho người dùng này." });
+        }
 
-        // Find the message document for this chat room
+        // Find or create the message document
         let messageDoc = await Message.findOne({ chatRoomId });
         if (!messageDoc) {
-            messageDoc = await Message.create({
-                chatRoomId,
-                messages: []
-            });
+            messageDoc = await Message.create({ chatRoomId, messages: [] });
         }
 
         const newMessage = {
@@ -205,23 +203,29 @@ exports.sendMessage = async (req, res) => {
         };
 
         messageDoc.messages.push(newMessage);
-        await messageDoc.save();
-
+        
+        // Update both in parallel
         const updateData = {
-            lastMessage: type === 'IMAGE' ? '[Hình ảnh]' : content,
-            lastMessageAt: new Date()
+            $set: {
+                lastMessage: type === 'IMAGE' ? '[Hình ảnh]' : content,
+                lastMessageAt: new Date()
+            },
+            $pull: { deletedBy: { $in: [senderId, receiverId] } }
         };
 
-        if (chatRoom.deletedBy && chatRoom.deletedBy.includes(receiverId)) {
-            updateData.$pull = { deletedBy: receiverId };
-        }
-        
-        if (chatRoom.deletedBy && chatRoom.deletedBy.includes(senderId)) {
-            if (!updateData.$pull) updateData.$pull = {};
-            updateData.$pull.deletedBy = senderId;
-        }
+        await Promise.all([
+            messageDoc.save(),
+            ChatRoom.updateOne({ _id: chatRoomId }, updateData)
+        ]);
 
-        await ChatRoom.findByIdAndUpdate(chatRoomId, updateData);
+        // Emit real-time event via Socket.io
+        const io = req.app.get("io");
+        if (io) {
+            io.to(chatRoomId).emit("new_message", {
+                chatRoomId,
+                newMessage
+            });
+        }
 
         res.json({ success: true, newMessage });
     } catch (error) {
@@ -230,7 +234,6 @@ exports.sendMessage = async (req, res) => {
     }
 };
 
-// Search Messages
 exports.searchMessages = async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -329,7 +332,6 @@ exports.markAsRead = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-// Delete Chat (Soft Delete)
 exports.deleteChat = async (req, res) => {
     try {
         const { chatRoomId } = req.params;
@@ -364,7 +366,6 @@ exports.deleteChat = async (req, res) => {
     }
 };
 
-// Set Nickname
 exports.setNickname = async (req, res) => {
     try {
         const { chatRoomId } = req.params;

@@ -10,6 +10,12 @@ exports.createNotification = async ({ recipientId, senderId, type, message, rela
             relatedId
         });
         await notification.save();
+
+        // Emit real-time notification if app instance is available within the controller
+        // Note: For createNotification which might be called as a helper, 
+        // we might need to handle req differently or pass io.
+        // For now, let's keep it simple or assume it's called via req context in future.
+        
         return notification;
     } catch (error) {
         console.error("Error creating notification:", error);
@@ -150,6 +156,13 @@ exports.createSystemNotification = async (req, res) => {
                 await notification.save();
                 notifications.push(notification);
             }
+        }
+
+        const io = req.app.get("io");
+        if (io) {
+            notifications.forEach(notif => {
+                io.to(notif.recipientId.toString()).emit("new_notification", notif);
+            });
         }
 
         res.status(201).json({ success: true, message: "Notification sent", count: notifications.length });

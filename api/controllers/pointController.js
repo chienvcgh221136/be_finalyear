@@ -443,7 +443,7 @@ exports.getUsersWithPoints = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const users = await User.find(query)
-            .select('name email phone points role avatar lastLogin createdAt isBanned violationCount handledViolations')
+            .select('name email phone points role avatar lastLogin createdAt isBanned violationCount handledViolations isProfileRewardGiven')
             .sort({ points: sortDir })
             .skip(skip)
             .limit(parseInt(limit));
@@ -478,6 +478,13 @@ exports.adjustUserPoints = async (req, res) => {
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: "User not found" });
+
+        // Check if this is the profile reward
+        if (description === "admin.points.adjustment_reasons.profile" || 
+            description === "Thưởng cập nhật hồ sơ cá nhân đầy đủ + ảnh đại diện") {
+            user.isProfileRewardGiven = true;
+            await user.save();
+        }
 
         // Update User Points
         if (pointAmount > 0) {

@@ -2,6 +2,8 @@ require("dotenv").config({ override: true });
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const userRoutes = require("./api/routes/userRoutes");
 const authRoutes = require("./api/routes/authRoutes");
@@ -29,6 +31,16 @@ require("./api/cron/pointCron");
 const cookieParser = require("cookie-parser");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*", 
+    credentials: true
+  }
+});
+
+app.set("io", io);
+
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
@@ -86,11 +98,24 @@ app.get("/api/ping", (req, res) => {
 });
 
 
+io.on("connection", (socket) => {
+  console.log("📡 New client connected:", socket.id);
+
+  socket.on("join_room", (roomId) => {
+    socket.join(roomId);
+    console.log(`👤 User joined room: ${roomId}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔌 Client disconnected");
+  });
+});
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB connected successfully");
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
   })

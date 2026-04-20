@@ -47,9 +47,17 @@ exports.register = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        const user = await User.create({
-            name, email, passwordHash, phone, isVerified: true
-        });
+        const userObj = {
+            name,
+            email,
+            passwordHash,
+            isVerified: true
+        };
+        if (phone && phone.trim() !== '') {
+            userObj.phone = phone.trim();
+        }
+
+        const user = await User.create(userObj);
 
         const token = jwt.sign({ userId: user._id, role: user.role },
             process.env.JWT_SECRET, { expiresIn: "1d" });
@@ -246,9 +254,19 @@ exports.googleLogin = async (req, res) => {
         const ticket = await client.verifyIdToken({
             idToken: token,
             audience: process.env.GOOGLE_CLIENT_ID,
+            // Add a small leeway for clock skew between servers
+            clockSkewLeeway: 30, 
         });
         const payload = ticket.getPayload();
+        if (!payload) {
+            throw new Error("Could not retrieve payload from Google token");
+        }
+
         const { sub: googleId, name, picture } = payload;
+        
+        if (!payload.email) {
+            throw new Error("Google account does not provide an email address");
+        }
         const email = payload.email.toLowerCase();
 
         let user = await User.findOne({
@@ -347,7 +365,11 @@ exports.googleLogin = async (req, res) => {
 
     } catch (err) {
         console.error("Google Login Error:", err);
-        res.status(500).json({ success: false, message: "Google Login failed", error: err.message });
+        res.status(500).json({ 
+            success: false, 
+            message: "Google Login failed: " + err.message, 
+            error: err.message 
+        });
     }
 };
 

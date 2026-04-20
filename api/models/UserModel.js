@@ -20,6 +20,7 @@ const UserSchema = new mongoose.Schema(
     coverImage: { type: String, default: "" },
     violationCount: { type: Number, default: 0 },
     handledViolations: { type: Number, default: 0 },
+    isProfileRewardGiven: { type: Boolean, default: false },
     vip: {
       isActive: { type: Boolean, default: false },
       vipType: { type: String, default: "NONE" },
@@ -30,7 +31,8 @@ const UserSchema = new mongoose.Schema(
       dailyUsedSlots: { type: Number, default: 0 },
       currentVipPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Post" }],
       bonusPushCredits: { type: Number, default: 0 },  // Bonus push post credits from items
-      bonusLeadCredits: { type: Number, default: 0 }   // Bonus lead view credits from items
+      bonusLeadCredits: { type: Number, default: 0 },   // Bonus lead view credits from items
+      lastResetDate: { type: Date, default: null }       // Tracks the last daily slot reset
     },
     inventory: {
       postPush: { type: Number, default: 0 },

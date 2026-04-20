@@ -2,6 +2,34 @@ const VipPackage = require("../models/VipPackageModel");
 const User = require("../models/UserModel");
 const { Wallet, Transaction } = require("../models/WalletModel");
 
+/**
+ * Lazy Reset: Checks if daily VIP slots need to be reset for a given user.
+ * This is more reliable than a cron job on Render's free tier (which sleeps).
+ * Timezone: Asia/Ho_Chi_Minh (UTC+7)
+ */
+const checkAndResetDailyLimits = async (user) => {
+    // Get start of today in UTC+7
+    const now = new Date();
+    const utcPlus7 = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const todayStr = utcPlus7.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
+    const lastReset = user.vip.lastResetDate;
+    let lastResetStr = null;
+    if (lastReset) {
+        const lastResetUtcPlus7 = new Date(lastReset.getTime() + 7 * 60 * 60 * 1000);
+        lastResetStr = lastResetUtcPlus7.toISOString().split('T')[0];
+    }
+
+    // If last reset was on a different day (or never), reset the slots
+    if (lastResetStr !== todayStr) {
+        user.vip.dailyUsedSlots = 0;
+        user.vip.lastResetDate = now;
+        await user.save();
+    }
+};
+
+
+
 exports.createPackage = async (req, res) => {
     try {
         const { name, price, durationDays, priorityScore, description, perks, limitViewPhone, postLimit, isPopular } = req.body;
@@ -188,7 +216,6 @@ exports.upgradeVip = async (req, res) => {
 exports.updatePackage = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log(`Updating package ${id}. Body:`, JSON.stringify(req.body, null, 2));
 
         const { name, price, durationDays, priorityScore, description, perks, limitViewPhone, postLimit, isActive } = req.body;
         const isPopular = req.body.isPopular === true || req.body.isPopular === 'true';
@@ -330,6 +357,9 @@ exports.getMyVip = async (req, res) => {
             .select('vip')
             .populate('vip.packageId');
 
+        // Lazy Reset: check and reset daily limits if a new day has started
+        await checkAndResetDailyLimits(user);
+
         // Calculate daily viewed phones
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
@@ -443,6 +473,9 @@ exports.attachVip = async (req, res) => {
         }
 
         const user = await User.findById(userId).populate("vip.packageId");
+
+        // Lazy Reset: check and reset daily limits if a new day has started
+        await checkAndResetDailyLimits(user);
 
         // Logic to allow bonus credits usage even without active VIP
         const hasBonus = (user.vip.bonusPushCredits || 0) > 0;
