@@ -165,6 +165,7 @@ exports.login = async (req, res) => {
 
         res.json({
             success: true,
+            token: accessToken,
             user: {
                 id: user._id,
                 name: user.name,
@@ -351,6 +352,7 @@ exports.googleLogin = async (req, res) => {
 
         res.json({
             success: true,
+            token: accessToken,
             user: {
                 id: user._id,
                 name: user.name,

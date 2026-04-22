@@ -20,7 +20,7 @@ cron.schedule('*/10 * * * *', async () => {
             // Level 1: Reminder (> 2 hours)
             if (diffHours >= 2 && req.escalationLevel < 1) {
                 console.log(`[ESCALATION] Level 1 (Reminder) for Request ${req._id}`);
-                await emailService.sendAdminWithdrawReminder(req.userId.name, req.amount, Math.floor(diffHours), req._id);
+                await emailService.sendAdminWithdrawReminder(req.userId?.name || 'Khách', req.amount, Math.floor(diffHours), req._id);
                 req.escalationLevel = 1;
                 await req.save();
             }
@@ -28,7 +28,7 @@ cron.schedule('*/10 * * * *', async () => {
             // Level 2: Urgent (> 24 hours)
             else if (diffHours >= 24 && req.escalationLevel < 2) {
                 console.log(`[ESCALATION] Level 2 (Urgent) for Request ${req._id}`);
-                await emailService.sendAdminWithdrawUrgent(req.userId.name, req.amount, Math.floor(diffHours), req._id);
+                await emailService.sendAdminWithdrawUrgent(req.userId?.name || 'Khách', req.amount, Math.floor(diffHours), req._id);
                 req.escalationLevel = 2;
                 await req.save();
 
@@ -65,7 +65,7 @@ cron.schedule('*/10 * * * *', async () => {
                 }
 
                 // Notify User
-                if (emailService.sendWithdrawStatusUpdate) {
+                if (emailService.sendWithdrawStatusUpdate && req.userId?.email) {
                     await emailService.sendWithdrawStatusUpdate(
                         req.userId.email,
                         req.userId.name,

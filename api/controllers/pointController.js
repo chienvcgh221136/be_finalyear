@@ -4,6 +4,7 @@ const VipPackage = require("../models/VipPackageModel");
 const Post = require("../models/PostModel");
 const emailService = require("../services/emailService");
 const Notification = require("../models/NotificationModel");
+const i18n = require("../utils/i18n");
 
 // Constants for Reward Costs
 const REWARDS = {
@@ -36,6 +37,7 @@ exports.getMyPoints = async (req, res) => {
                     action: log.action,
                     points: log.points,
                     type: log.type,
+                    description: log.description,
                     createdAt: log.createdAt
                 })),
                 expiringSoon: await getExpiringSoon(userId)
@@ -509,27 +511,8 @@ exports.adjustUserPoints = async (req, res) => {
                     // Send Ban Email
                     const lang = user.language || 'vi';
 
-                    // Simple server-side translation map for known penalty reasons
-                    const translations = {
-                        vi: {
-                            "admin.points.adjustment_reasons.violation_warning": "Nhắc nhở vi phạm",
-                            "admin.points.adjustment_reasons.violation_deduct_15": "Tái phạm lần 2: Trừ 15% tổng điểm",
-                            "admin.points.adjustment_reasons.violation_deduct_30": "Tái phạm lần 3: Trừ 30% tổng điểm",
-                            "admin.points.adjustment_reasons.violation_deduct_50": "Vi phạm nghiêm trọng: Trừ 50% tổng điểm",
-                            "admin.points.adjustment_reasons.violation_ban": "Mức phạt tối đa: Tịch thu toàn bộ điểm & Khóa tài khoản"
-                        },
-                        en: {
-                            "admin.points.adjustment_reasons.violation_warning": "Violation reminder",
-                            "admin.points.adjustment_reasons.violation_deduct_15": "Repeat violation 2: Deduct 15% total points",
-                            "admin.points.adjustment_reasons.violation_deduct_30": "Repeat violation 3: Deduct 30% total points",
-                            "admin.points.adjustment_reasons.violation_deduct_50": "Serious violation: Deduct 50% total points",
-                            "admin.points.adjustment_reasons.violation_ban": "Maximum penalty: Forfeit all points & Permanent ban"
-                        }
-                    };
-
-                    const translatedReason = (translations[lang] && translations[lang][description])
-                        || description
-                        || (lang === 'en' ? "Community standards violation" : "Vi phạm quy hoạch hệ thống");
+                    // Get translated reason using centralized utility
+                    const translatedReason = i18n.t(description, lang);
 
                     await emailService.sendBanEmail(user.email, user.name, translatedReason, lang);
                 }
@@ -545,13 +528,22 @@ exports.adjustUserPoints = async (req, res) => {
         let notifMessage = "";
         let notifType = "POINT";
 
+        const lang = user.language || 'vi';
+        const translatedDesc = i18n.t(description, lang);
+
         if (pointAmount === 0) {
             notifType = "SYSTEM";
-            notifMessage = `[CẢNH BÁO VI PHẠM]: ${description || 'Bạn vừa nhận được một cảnh cáo nhắc nhở từ Quản trị viên.'}`;
+            notifMessage = i18n.t('notifications.patterns.admin_violation_prefix', lang, { content: translatedDesc });
         } else if (pointAmount > 0) {
-            notifMessage = `[CỘNG ĐIỂM] ${description || 'Quản trị viên đã thưởng điểm cho bạn.'} (+${pointAmount.toLocaleString()} PTS)`;
+            notifMessage = i18n.t('notifications.patterns.admin_earn_detail', lang, {
+                content: translatedDesc,
+                amount: pointAmount.toLocaleString()
+            });
         } else {
-            notifMessage = `[TRỪ ĐIỂM] ${description || 'Khấu trừ điểm do vi phạm quy định.'} (-${Math.abs(pointAmount).toLocaleString()} PTS)`;
+            notifMessage = i18n.t('notifications.patterns.admin_spend_detail', lang, {
+                content: translatedDesc,
+                amount: Math.abs(pointAmount).toLocaleString()
+            });
         }
 
         await Notification.create({

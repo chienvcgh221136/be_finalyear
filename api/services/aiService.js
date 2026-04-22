@@ -2,10 +2,10 @@ const Groq = require("groq-sdk");
 
 const API_KEY = process.env.GROQ_API_KEY;
 if (!API_KEY) {
-    console.error("[Groq] ERROR: GROQ_API_KEY is not defined in .env");
+    console.error("[Groq] WARNING: GROQ_API_KEY is not defined in .env. AI Search/Chat will be disabled.");
 }
 
-const groq = new Groq({ apiKey: API_KEY });
+const groq = API_KEY ? new Groq({ apiKey: API_KEY }) : null;
 
 console.log(`[Groq] Using API Key: ${API_KEY ? API_KEY.substring(0, 10) + '...' : 'undefined'}`);
 
@@ -43,6 +43,11 @@ const extractSearchParams = async (userQuery) => {
     `;
 
     try {
+        if (!groq) {
+            console.error("[Groq] AI Search disabled because API key is missing.");
+            return {};
+        }
+
         const response = await groq.chat.completions.create({
             messages: [{ role: "user", content: prompt }],
             model: "llama-3.1-8b-instant",
@@ -119,6 +124,11 @@ const generateChatResponse = async (userQuery, posts, stats = null, vipPackages 
     ];
 
     try {
+        if (!groq) {
+            console.error("[Groq] AI Chat disabled because API key is missing.");
+            return "Xin lỗi, chatbot hiện đang tạm ngưng do chưa thiết lập API Key.";
+        }
+
         const response = await groq.chat.completions.create({
             messages: messages,
             model: "llama-3.3-70b-versatile",

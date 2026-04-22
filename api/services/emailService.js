@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const i18n = require('../utils/i18n');
 
 // Create transporter
 const transporter = nodemailer.createTransport({
@@ -14,15 +15,17 @@ const transporter = nodemailer.createTransport({
 exports.sendTopupSuccessEmail = async (to, userName, amount, newBalance, lang = 'vi') => {
     try {
         if (!to) return;
-        
-        const isEn = lang === 'en';
-        const subject = isEn ? '✅ Top-up Successful!' : '✅ Nạp tiền thành công!';
-        const header = isEn ? 'Top-up Successful!' : 'Nạp tiền thành công!';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn ? `You have successfully topped up: <strong style="color: #16a34a; font-size: 18px;">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</strong> into your EstateMarket wallet.` : `Bạn vừa nạp thành công số tiền: <strong style="color: #16a34a; font-size: 18px;">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</strong> vào ví EstateMarket.`;
-        const balanceLabel = isEn ? `Current balance:` : `Số dư hiện tại:`;
-        const thanks = isEn ? `Thank you for using our service.` : `Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi.`;
-        const footerText = isEn ? `This is an automated email, please do not reply.` : `Đây là email tự động, vui lòng không trả lời.`;
+
+        const formattedAmount = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        const formattedBalance = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(newBalance);
+
+        const subject = i18n.t('emails.topup_success.subject', lang);
+        const header = i18n.t('emails.topup_success.header', lang);
+        const greeting = i18n.t('emails.topup_success.greeting', lang, { userName });
+        const content = i18n.t('emails.topup_success.content', lang, { amount: formattedAmount });
+        const balanceLabel = i18n.t('emails.topup_success.balance_label', lang);
+        const thanks = i18n.t('emails.common.thanks', lang);
+        const footerText = i18n.t('emails.common.footer', lang);
 
         const info = await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
@@ -36,7 +39,7 @@ exports.sendTopupSuccessEmail = async (to, userName, amount, newBalance, lang = 
                     
                     <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
                         <p style="margin: 0;">${balanceLabel}</p>
-                        <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #1f2937;">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(newBalance)}</p>
+                        <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #1f2937;">${formattedBalance}</p>
                     </div>
                     
                     <p>${thanks}</p>
@@ -57,13 +60,14 @@ exports.sendTopupSuccessEmail = async (to, userName, amount, newBalance, lang = 
 exports.sendWithdrawOTP = async (to, userName, otp, amount, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-        const subject = isEn ? '🔐 Withdrawal OTP' : '🔐 Mã xác nhận rút tiền';
-        const header = isEn ? 'Withdrawal Request' : 'Yêu cầu rút tiền';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn ? `You are requesting to withdraw: <strong style="color: #ef4444; font-size: 18px;">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</strong>.` : `Bạn đang thực hiện yêu cầu rút số tiền: <strong style="color: #ef4444; font-size: 18px;">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</strong>.`;
-        const otpText = isEn ? `Your verification OTP is:` : `Mã OTP xác thực của bạn là:`;
-        const footer = isEn ? `This code will expire in 10 minutes. Do not share this code with anyone.` : `Mã này sẽ hết hạn trong 10 phút. Tuyệt đối không chia sẻ mã này cho bất kỳ ai.`;
+        const formattedAmount = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+
+        const subject = i18n.t('emails.withdraw_otp.subject', lang);
+        const header = i18n.t('emails.withdraw_otp.header', lang);
+        const greeting = i18n.t('emails.withdraw_otp.greeting', lang, { userName });
+        const content = i18n.t('emails.withdraw_otp.content', lang, { amount: formattedAmount });
+        const otpText = i18n.t('emails.withdraw_otp.otp_text', lang);
+        const footer = i18n.t('emails.withdraw_otp.footer', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
@@ -91,11 +95,9 @@ exports.sendWithdrawOTP = async (to, userName, otp, amount, lang = 'vi') => {
 
 exports.sendAdminWithdrawNotification = async (userName, amount, requestId, lang = 'vi') => {
     try {
-        const isEn = lang === 'en';
-        const subject = isEn ? '🔔 [ADMIN] New Withdrawal Request' : '🔔 [ADMIN] Yêu cầu rút tiền mới';
-        const header = isEn ? 'New Withdrawal Request' : 'Yêu cầu rút tiền mới';
-        const amountLabel = isEn ? 'Amount:' : 'Số tiền:';
-        const checkLink = isEn ? 'Check now' : 'Kiểm tra ngay';
+        const subject = i18n.t('emails.admin_withdraw.notif_subject', lang);
+        const header = i18n.t('emails.admin_withdraw.notif_header', lang);
+        const checkLink = i18n.t('emails.admin_withdraw.notif_btn', lang);
 
         console.log("Attempting to send Admin Withdraw Notification...");
         console.log("Env ADMIN_EMAIL:", process.env.ADMIN_EMAIL);
@@ -116,9 +118,8 @@ exports.sendAdminWithdrawNotification = async (userName, amount, requestId, lang
             html: `
                 <div style="font-family: Arial, sans-serif;">
                     <h3>${header}</h3>
-                    <p>User: <strong>${userName}</strong></p>
-                    <p>${amountLabel} <strong>${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</strong></p>
-                    <p>Request ID: ${requestId}</p>
+                    <p>${i18n.t('emails.admin_withdraw.notif_content', lang, { userName, amount: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount) })}</p>
+                    <p>${i18n.t('emails.admin_withdraw.notif_content_id', lang, { requestId })}</p>
                     <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/withdrawals">${checkLink}</a>
                 </div>
             `,
@@ -129,24 +130,77 @@ exports.sendAdminWithdrawNotification = async (userName, amount, requestId, lang
     }
 };
 
+exports.sendAdminWithdrawReminder = async (userName, amount, hours, requestId, lang = 'vi') => {
+    try {
+        const subject = i18n.t('emails.admin_withdraw.remind_subject', lang, { hours });
+        const header = i18n.t('emails.admin_withdraw.remind_header', lang);
+        const checkLink = i18n.t('emails.admin_withdraw.remind_btn', lang);
+
+        const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER;
+        if (!adminEmail) return;
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"EstateMarket System" <system@estatemarket.com>',
+            to: adminEmail,
+            subject: subject,
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h3 style="color: #f59e0b;">${header}</h3>
+                    <p>${i18n.t('emails.admin_withdraw.remind_content', lang, { userName, amount: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount) })}</p>
+                    <p>${i18n.t('emails.admin_withdraw.remind_details', lang, { hours })}</p>
+                    <p>${i18n.t('emails.admin_withdraw.remind_content_id', lang, { requestId })}</p>
+                    <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/withdrawals">${checkLink}</a>
+                </div>
+            `,
+        });
+    } catch (error) {
+        console.error("Error sending admin reminder:", error);
+    }
+};
+
+exports.sendAdminWithdrawUrgent = async (userName, amount, hours, requestId, lang = 'vi') => {
+    try {
+        const subject = i18n.t('emails.admin_withdraw.urgent_subject', lang, { hours });
+        const header = i18n.t('emails.admin_withdraw.urgent_header', lang);
+        const checkLink = i18n.t('emails.admin_withdraw.urgent_btn', lang);
+
+        const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER;
+        if (!adminEmail) return;
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"EstateMarket System" <system@estatemarket.com>',
+            to: adminEmail,
+            subject: subject,
+            html: `
+                <div style="font-family: Arial, sans-serif; border: 2px solid red; padding: 10px;">
+                    <h3 style="color: red;">${header}</h3>
+                    <p>${i18n.t('emails.admin_withdraw.urgent_content', lang, { userName, amount: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount) })}</p>
+                    <p>${i18n.t('emails.admin_withdraw.urgent_details', lang, { hours })}</p>
+                    <p>${i18n.t('emails.admin_withdraw.urgent_content_id', lang, { requestId })}</p>
+                    <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/withdrawals">${checkLink}</a>
+                </div>
+            `,
+        });
+    } catch (error) {
+        console.error("Error sending admin urgent:", error);
+    }
+};
+
 exports.sendWithdrawStatusUpdate = async (to, userName, status, amount, note, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-
+        const statusText = i18n.t(`emails.withdraw_status.${status.toLowerCase()}_text`, lang) || status;
         let statusColor = '#3b82f6';
-        let statusText = isEn ? 'Processing' : 'Đang xử lý';
-        if (status === 'APPROVED') { statusColor = '#10b981'; statusText = isEn ? 'Approved' : 'Đã duyệt'; }
-        if (status === 'REJECTED') { statusColor = '#ef4444'; statusText = isEn ? 'Rejected' : 'Từ chối'; }
-        if (status === 'PAID') { statusColor = '#10b981'; statusText = isEn ? 'Paid' : 'Đã thanh toán'; }
+        if (status === 'APPROVED') statusColor = '#10b981';
+        if (status === 'REJECTED') statusColor = '#ef4444';
+        if (status === 'PAID') statusColor = '#10b981';
 
-        const subject = isEn ? `📢 Withdrawal Status Update: ${statusText}` : `📢 Cập nhật trạng thái rút tiền: ${statusText}`;
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn 
-            ? `Your withdrawal request of <strong>${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</strong> has changed status to: <strong style="color: ${statusColor};">${statusText}</strong>.` 
-            : `Yêu cầu rút tiền <strong>${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}</strong> của bạn đã chuyển sang trạng thái: <strong style="color: ${statusColor};">${statusText}</strong>.`;
-        const noteLabel = isEn ? `Note from Admin:` : `Ghi chú từ Admin:`;
-        const thanks = isEn ? `Thank you for using our service.` : `Cảm ơn bạn đã sử dụng dịch vụ.`;
+        const subject = i18n.t('emails.withdraw_status.subject', lang);
+        const greeting = i18n.t('emails.common.greeting', lang, { userName }) || `Xin chào <strong>${userName}</strong>,`;
+        const amountFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+        const content = i18n.t('emails.withdraw_status.content', lang, { amountFormatted, statusColor, statusText }) || `Yêu cầu rút tiền <strong>${amountFormatted}</strong> của bạn đã chuyển sang trạng thái: <strong style="color: ${statusColor};">${statusText}</strong>.`;
+        const noteLabel = i18n.t('emails.common.admin_note', lang) || `Ghi chú từ Admin:`;
+        const thanks = i18n.t('emails.common.thanks', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
@@ -173,15 +227,14 @@ exports.sendWithdrawStatusUpdate = async (to, userName, status, amount, note, la
 exports.sendAppointmentRequestSender = async (to, userName, postTitle, time, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-        
-        const subject = isEn ? '📅 Viewing Appointment Request Confirmation' : '📅 Xác nhận yêu cầu đặt lịch xem nhà';
-        const header = isEn ? 'Request Sent!' : 'Yêu cầu đã được gửi!';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn ? `You have sent a viewing appointment request for the property: <strong>${postTitle}</strong>.` : `Bạn đã gửi yêu cầu xem nhà cho tin đăng: <strong>${postTitle}</strong>.`;
-        const timeLabel = isEn ? `Time:` : `Thời gian:`;
-        const pendingWait = isEn ? `Please wait for the seller to confirm. We will notify you of the result soon.` : `Vui lòng chờ người bán xác nhận. Chúng tôi sẽ thông báo ngay khi có kết quả.`;
-        const thanks = isEn ? `Thank you for using EstateMarket.` : `Cảm ơn bạn đã sử dụng EstateMarket.`;
+        const subject = i18n.t('emails.appointment.sender_subject', lang);
+        const header = i18n.t('emails.appointment.sender_header', lang);
+        const greeting = i18n.t('emails.appointment.sender_greeting', lang, { buyerName: userName });
+        const content = i18n.t('emails.appointment.sender_content', lang, { postTitle });
+        const timeLabel = i18n.t('emails.appointment.sender_time', lang);
+        const pendingWait = i18n.t('emails.appointment.sender_note', lang);
+        const thanks = i18n.t('emails.common.thanks', lang);
+        const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN');
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
@@ -192,7 +245,7 @@ exports.sendAppointmentRequestSender = async (to, userName, postTitle, time, lan
                     <h2 style="color: #2563eb;">${header}</h2>
                     <p>${greeting}</p>
                     <p>${content}</p>
-                    <p>${timeLabel} <strong>${new Date(time).toLocaleString(isEn ? 'en-US' : 'vi-VN')}</strong></p>
+                    <p>${timeLabel} <strong>${formattedTime}</strong></p>
                     <p>${pendingWait}</p>
                     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
                     <p style="color: #6b7280; font-size: 12px;">${thanks}</p>
@@ -209,17 +262,16 @@ exports.sendAppointmentRequestSender = async (to, userName, postTitle, time, lan
 exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postTitle, time, note, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-
-        const subject = isEn ? '🔔 You have a new viewing appointment request' : '🔔 Bạn có yêu cầu xem nhà mới';
-        const header = isEn ? 'New viewing request!' : 'Yêu cầu xem nhà mới!';
-        const greeting = isEn ? `Hello <strong>${sellerName}</strong>,` : `Xin chào <strong>${sellerName}</strong>,`;
-        const content = isEn ? `User <strong>${buyerName}</strong> wants to schedule a viewing for your property: <strong>${postTitle}</strong>.` : `Người dùng <strong>${buyerName}</strong> muốn đặt lịch xem nhà của bạn: <strong>${postTitle}</strong>.`;
-        const timeLabel = isEn ? `Time:` : `Thời gian:`;
-        const noteLabel = isEn ? `Note:` : `Ghi chú:`;
-        const noNote = isEn ? `None` : `Không có`;
-        const actionText = isEn ? `Please visit your profile to Accept or Reject.` : `Vui lòng truy cập trang cá nhân để Chấp nhận hoặc Từ chối.`;
-        const btnText = isEn ? `Manage Appointments` : `Quản lý lịch hẹn`;
+        const subject = i18n.t('emails.appointment.receiver_subject', lang);
+        const header = i18n.t('emails.appointment.receiver_header', lang);
+        const greeting = i18n.t('emails.appointment.receiver_greeting', lang, { sellerName });
+        const content = i18n.t('emails.appointment.receiver_content', lang, { buyerName, postTitle });
+        const timeLabel = i18n.t('emails.appointment.receiver_time', lang);
+        const noteLabel = i18n.t('emails.appointment.update_note', lang) || 'Ghi chú:';
+        const noNote = i18n.t('common.none', lang) || 'Không có';
+        const actionText = i18n.t('emails.appointment.receiver_note', lang);
+        const btnText = i18n.t('emails.appointment.receiver_btn', lang);
+        const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN');
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket System" <system@estatemarket.com>',
@@ -249,20 +301,17 @@ exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postT
 exports.sendAppointmentStatusUpdate = async (to, userName, postTitle, status, time, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
+        const statusKey = status === 'APPROVED' ? 'update_accepted' : 'update_rejected';
+        const color = status === 'APPROVED' ? '#16a34a' : '#ef4444';
+        const statusText = i18n.t(`emails.appointment.${statusKey}`, lang);
 
-        let statusText = status === 'APPROVED' ? (isEn ? 'Approved ✅' : 'Được chấp nhận ✅') : (isEn ? 'Rejected ❌' : 'Bị từ chối ❌');
-        let color = status === 'APPROVED' ? '#16a34a' : '#ef4444';
-
-        const subject = isEn ? `📢 Appointment Update: ${statusText}` : `📢 Cập nhật lịch hẹn: ${statusText}`;
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn 
-            ? `Your viewing request for <strong>${postTitle}</strong> on <strong>${new Date(time).toLocaleString('en-US')}</strong> has been <strong>${statusText}</strong>.`
-            : `Yêu cầu xem nhà <strong>${postTitle}</strong> của bạn vào lúc <strong>${new Date(time).toLocaleString('vi-VN')}</strong> đã <strong>${statusText}</strong>.`;
+        const subject = i18n.t('emails.appointment.update_subject', lang);
+        const greeting = i18n.t('emails.appointment.update_greeting', lang, { buyerName: userName });
+        const content = i18n.t('emails.appointment.update_content', lang, { postTitle });
         
-        const approvedExtra = isEn ? '<p>Please arrive on time or contact the seller if there are changes.</p>' : '<p>Vui lòng đến đúng giờ hoặc liên hệ người bán nếu có thay đổi.</p>';
-        const rejectedExtra = isEn ? '<p>You can try scheduling for a different time.</p>' : '<p>Bạn có thể thử đặt lịch vào thời gian khác.</p>';
-        const thanks = isEn ? `Thank you for using EstateMarket.` : `Cảm ơn bạn đã sử dụng EstateMarket.`;
+        const approvedExtra = i18n.t('emails.appointment.update_note_approved', lang);
+        const rejectedExtra = i18n.t('emails.appointment.update_note_rejected', lang);
+        const thanks = i18n.t('emails.common.thanks', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
@@ -289,36 +338,21 @@ exports.sendAppointmentStatusUpdate = async (to, userName, postTitle, status, ti
 exports.sendViolationWarning = async (to, userName, postTitle, reason, description, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-
         let reasonText = reason;
-        const reasonsVi = {
-            'WRONG_INFO': 'Thông tin sai lệch',
-            'SCAM': 'Lừa đảo',
-            'DUPLICATE': 'Tin trùng lặp',
-            'SPAM': 'Spam',
-            'OTHER': 'Khác'
-        };
-        const reasonsEn = {
-            'WRONG_INFO': 'Misleading information',
-            'SCAM': 'Scam / Fraud',
-            'DUPLICATE': 'Duplicate post',
-            'SPAM': 'Spam',
-            'OTHER': 'Other'
-        };
-        
-        const currentReasons = isEn ? reasonsEn : reasonsVi;
+        const reasonsVi = { 'WRONG_INFO': 'Thông tin sai lệch', 'SCAM': 'Lừa đảo', 'DUPLICATE': 'Tin trùng lặp', 'SPAM': 'Spam', 'OTHER': 'Khác' };
+        const reasonsEn = { 'WRONG_INFO': 'Misleading information', 'SCAM': 'Scam / Fraud', 'DUPLICATE': 'Duplicate post', 'SPAM': 'Spam', 'OTHER': 'Other' };
+        const currentReasons = lang === 'en' ? reasonsEn : reasonsVi;
         if (currentReasons[reason]) reasonText = currentReasons[reason];
 
-        const subject = isEn ? '⚠️ Post Violation Warning' : '⚠️ Cảnh báo vi phạm quy định đăng tin';
-        const header = isEn ? 'Violation Warning' : 'Cảnh báo vi phạm';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn ? `Your post: <strong>${postTitle}</strong> has been reported and confirmed to violate EstateMarket's policies.` : `Bài đăng của bạn: <strong>${postTitle}</strong> đã bị báo cáo và xác nhận vi phạm quy định của EstateMarket.`;
-        const reasonLabel = isEn ? `Reason:` : `Lý do:`;
-        const detailLabel = isEn ? `Details:` : `Chi tiết:`;
-        const warningAction = isEn ? `Please <strong>edit your post</strong> to comply with our policies immediately. If the violation continues, your account may be locked.` : `Vui lòng <strong>chỉnh sửa bài đăng</strong> để tuân thủ quy định ngay lập tức. Nếu tiếp tục vi phạm, tài khoản của bạn có thể bị khóa.`;
-        const btnText = isEn ? `Manage Posts` : `Quản lý bài đăng`;
-        const footerText = isEn ? `EstateMarket Moderation Team` : `Đội ngũ kiểm duyệt EstateMarket`;
+        const subject = i18n.t('emails.moderation.violation_subject', lang);
+        const header = i18n.t('emails.moderation.violation_header', lang);
+        const greeting = i18n.t('emails.moderation.violation_greeting', lang, { userName });
+        const content = i18n.t('emails.moderation.violation_content', lang, { postTitle });
+        const reasonLabel = i18n.t('emails.moderation.violation_reason', lang);
+        const detailLabel = i18n.t('emails.moderation.violation_details_label', lang);
+        const warningAction = i18n.t('emails.moderation.violation_note', lang);
+        const btnText = i18n.t('emails.moderation.violation_manage_btn', lang);
+        const footerText = i18n.t('emails.common.estatemarket_support', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket System" <system@estatemarket.com>',
@@ -360,35 +394,21 @@ exports.sendViolationWarning = async (to, userName, postTitle, reason, descripti
 exports.sendUserViolationWarning = async (to, userName, reason, description, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-
         let reasonText = reason;
-        const reasonsVi = {
-            'WRONG_INFO': 'Thông tin sai lệch',
-            'SCAM': 'Lừa đảo',
-            'DUPLICATE': 'Tin trùng lặp',
-            'SPAM': 'Spam',
-            'OTHER': 'Khác'
-        };
-        const reasonsEn = {
-            'WRONG_INFO': 'Misleading information',
-            'SCAM': 'Scam / Fraud',
-            'DUPLICATE': 'Duplicate post',
-            'SPAM': 'Spam',
-            'OTHER': 'Other'
-        };
-        const currentReasons = isEn ? reasonsEn : reasonsVi;
+        const reasonsVi = { 'WRONG_INFO': 'Thông tin sai lệch', 'SCAM': 'Lừa đảo', 'DUPLICATE': 'Tin trùng lặp', 'SPAM': 'Spam', 'OTHER': 'Khác' };
+        const reasonsEn = { 'WRONG_INFO': 'Misleading information', 'SCAM': 'Scam / Fraud', 'DUPLICATE': 'Duplicate post', 'SPAM': 'Spam', 'OTHER': 'Other' };
+        const currentReasons = lang === 'en' ? reasonsEn : reasonsVi;
         if (currentReasons[reason]) reasonText = currentReasons[reason];
 
-        const subject = isEn ? '⚠️ Community Policy Violation Warning' : '⚠️ Cảnh báo vi phạm quy định cộng đồng';
-        const header = isEn ? 'Account Warning' : 'Cảnh báo tài khoản';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn ? `Your account has been reported and confirmed to violate EstateMarket's community policies.` : `Tài khoản của bạn đã bị báo cáo và xác nhận vi phạm quy định cộng đồng của EstateMarket.`;
-        const reasonLabel = isEn ? `Violation Reason:` : `Lý do vi phạm:`;
-        const detailLabel = isEn ? `Details:` : `Chi tiết:`;
-        const warningAction = isEn ? `We strongly suggest you review your actions. <strong>If violations continue, your account will be permanently banned.</strong>` : `Chúng tôi đề nghị bạn xem lại các hành động của mình. <strong>Nếu tiếp tục vi phạm, tài khoản của bạn sẽ bị khóa vĩnh viễn.</strong>`;
-        const btnText = isEn ? `View Policies` : `Xem quy định`;
-        const footerText = isEn ? `EstateMarket Moderation Team` : `Đội ngũ kiểm duyệt EstateMarket`;
+        const subject = i18n.t('emails.moderation.user_violation_subject', lang);
+        const header = i18n.t('emails.moderation.user_violation_header', lang);
+        const greeting = i18n.t('emails.moderation.user_violation_greeting', lang, { userName });
+        const content = i18n.t('emails.moderation.user_violation_content', lang);
+        const reasonLabel = i18n.t('emails.moderation.user_violation_reason', lang);
+        const detailLabel = i18n.t('emails.moderation.violation_details_label', lang);
+        const warningAction = i18n.t('emails.moderation.user_violation_note', lang);
+        const btnText = i18n.t('emails.moderation.user_violation_btn', lang);
+        const footerText = i18n.t('emails.common.estatemarket_support', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket System" <system@estatemarket.com>',
@@ -430,16 +450,14 @@ exports.sendUserViolationWarning = async (to, userName, reason, description, lan
 exports.sendAppointmentReminderSeller = async (to, sellerName, buyerName, postTitle, time, appointmentId, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-
-        const subject = isEn ? '⏰ Reminder: Pending Viewing Appointment' : '⏰ Nhắc nhở: Bạn có lịch hẹn chưa xử lý';
-        const header = isEn ? 'Appointment Reminder!' : 'Nhắc nhở lịch hẹn!';
-        const greeting = isEn ? `Hello <strong>${sellerName}</strong>,` : `Xin chào <strong>${sellerName}</strong>,`;
-        const content = isEn ? `You have an unresponded viewing request from <strong>${buyerName}</strong> for: <strong>${postTitle}</strong>.` : `Bạn có một yêu cầu xem nhà từ <strong>${buyerName}</strong> cho tin: <strong>${postTitle}</strong> chưa được xử lý.`;
-        const timeLabel = isEn ? `Time:` : `Thời gian:`;
-        const overdueText = isEn ? `This request was sent over 24 hours ago.` : `Yêu cầu này đã được gửi hơn 24 giờ trước.`;
-        const actionText = isEn ? `Please respond soon to avoid delaying the client.` : `Vui lòng phản hồi sớm để tránh làm mất thời gian của khách hàng.`;
-        const btnText = isEn ? `Process Now` : `Xử lý ngay`;
+        const subject = i18n.t('emails.appointment.remind_seller_subject', lang, { postTitle });
+        const header = i18n.t('emails.appointment.remind_seller_header', lang);
+        const greeting = i18n.t('emails.appointment.remind_seller_greeting', lang, { sellerName });
+        const content = i18n.t('emails.appointment.remind_seller_content', lang, { buyerName });
+        const timeLabel = i18n.t('emails.appointment.remind_seller_time', lang);
+        const overdueText = i18n.t('emails.appointment.remind_seller_overdue', lang);
+        const actionText = i18n.t('emails.appointment.remind_seller_action', lang);
+        const btnText = i18n.t('emails.appointment.remind_seller_btn', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket System" <system@estatemarket.com>',
@@ -451,7 +469,7 @@ exports.sendAppointmentReminderSeller = async (to, sellerName, buyerName, postTi
                     <p>${greeting}</p>
                     <p>${content}</p>
                     <div style="background-color: #fffbeb; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #fcd34d;">
-                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(isEn ? 'en-US' : 'vi-VN')}</p>
+                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN')}</p>
                         <p style="margin: 5px 0; font-size: 13px; color: #b45309;">${overdueText}</p>
                     </div>
                     <p>${actionText}</p>
@@ -469,15 +487,13 @@ exports.sendAppointmentReminderSeller = async (to, sellerName, buyerName, postTi
 exports.sendAppointmentReminderBuyer = async (to, buyerName, sellerName, postTitle, time, lang = 'vi') => {
     try {
         if (!to) return;
-        const isEn = lang === 'en';
-
-        const subject = isEn ? '⏳ We have reminded the seller about your appointment' : '⏳ Chúng tôi đã nhắc người bán về lịch hẹn của bạn';
-        const header = isEn ? 'Awaiting Response...' : 'Đang chờ phản hồi...';
-        const greeting = isEn ? `Hello <strong>${buyerName}</strong>,` : `Xin chào <strong>${buyerName}</strong>,`;
-        const content = isEn ? `Your viewing request for <strong>${postTitle}</strong> (at ${new Date(time).toLocaleString('en-US')}) is still awaiting <strong>${sellerName}</strong>'s confirmation.` : `Yêu cầu xem nhà của bạn cho tin <strong>${postTitle}</strong> (lúc ${new Date(time).toLocaleString('vi-VN')}) vẫn đang chờ <strong>${sellerName}</strong> xác nhận.`;
-        const reminderText = isEn ? `We have just sent an email to remind the seller to process your request soon.` : `Chúng tôi vừa gửi email nhắc nhở người bán để họ xử lý sớm yêu cầu của bạn.`;
-        const thanks = isEn ? `Thank you for your patience.` : `Cảm ơn bạn đã kiên nhẫn.`;
-        const footerText = isEn ? `EstateMarket Team` : `Đội ngũ EstateMarket`;
+        const subject = i18n.t('emails.appointment.remind_buyer_subject', lang, { postTitle });
+        const header = i18n.t('emails.appointment.remind_buyer_header', lang);
+        const greeting = i18n.t('emails.appointment.remind_buyer_greeting', lang, { buyerName });
+        const content = i18n.t('emails.appointment.remind_buyer_content', lang, { sellerName });
+        const reminderText = i18n.t('emails.appointment.remind_buyer_note', lang);
+        const thanks = i18n.t('emails.common.thanks', lang);
+        const footerText = i18n.t('emails.common.estatemarket_support', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
@@ -507,15 +523,15 @@ exports.sendPasswordResetOTP = async (to, userName, otp, lang = 'vi') => {
         if (!to) return;
         const isEn = lang === 'en';
 
-        const subject = isEn ? '🔐 Password Reset OTP' : '🔐 Mã xác nhận đặt lại mật khẩu';
-        const header = isEn ? 'Account Verification' : 'Xác thực tài khoản';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn ? `We received a request to reset your password. Please use the OTP below to proceed:` : `Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Vui lòng sử dụng mã OTP dưới đây để tiếp tục:`;
-        const noteLabel = isEn ? `Note:` : `Lưu ý:`;
-        const note1 = isEn ? `This code is valid for <strong>5 minutes</strong>.` : `Mã này có hiệu lực trong <strong>5 phút</strong>.`;
-        const note2 = isEn ? `If you did not make this request, please ignore this email.` : `Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.`;
-        const note3 = isEn ? `Do not share this code with anyone.` : `Tuyệt đối không chia sẻ mã này cho bất kỳ ai.`;
-        const footerText = isEn ? `© 2026 EstateMarket App. All rights reserved.` : `© 2026 EstateMarket App. Tất cả quyền được bảo lưu.`;
+        const subject = i18n.t('emails.password_reset.subject', lang);
+        const header = i18n.t('emails.password_reset.header', lang);
+        const greeting = i18n.t('emails.password_reset.greeting', lang, { userName });
+        const content = i18n.t('emails.password_reset.content', lang);
+        const noteLabel = i18n.t('emails.password_reset.note_label', lang);
+        const note1 = i18n.t('emails.password_reset.note_1', lang);
+        const note2 = i18n.t('emails.password_reset.note_2', lang);
+        const note3 = i18n.t('emails.password_reset.note_3', lang);
+        const footerText = i18n.t('common.footer_modal.content.footer_text', lang) || "© 2026 EstateMarket App";
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
@@ -559,20 +575,14 @@ exports.sendBanEmail = async (to, userName, reason, lang = 'vi') => {
         if (!to) return;
         const isEn = lang === 'en';
 
-        const subject = isEn ? '⛔ Account Banned Notification' : '⛔ Thông báo khóa tài khoản vĩnh viễn';
-        const header = isEn ? 'Account Banned' : 'Tài khoản đã bị khóa';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn 
-            ? `Your account on EstateMarket has been <strong>permanently banned</strong> due to multiple or severe violations of our community standards.` 
-            : `Tài khoản của bạn trên EstateMarket đã bị <strong>khóa vĩnh viễn</strong> do vi phạm nghiêm trọng hoặc lặp lại nhiều lần các quy định cộng đồng.`;
-        const reasonLabel = isEn ? `Reason for ban:` : `Lý do khóa:`;
-        const actionText = isEn 
-            ? `As a result, you can no longer log in, and all your active posts have been removed from the platform.` 
-            : `Hệ thống đã từ chối quyền truy cập của bạn, đồng thời toàn bộ tin đăng đang hoạt động của bạn đã bị gỡ khỏi nền tảng.`;
-        const appealText = isEn 
-            ? `If you believe this is a mistake, please contact our support team.` 
-            : `Nếu bạn cho rằng đây là một sự nhầm lẫn, vui lòng liên hệ với đội ngũ hỗ trợ của chúng tôi.`;
-        const footerText = isEn ? `EstateMarket Security Team` : `Đội ngũ an ninh EstateMarket`;
+        const subject = i18n.t('emails.ban_notification.subject', lang);
+        const header = i18n.t('emails.ban_notification.header', lang);
+        const greeting = i18n.t('emails.ban_notification.greeting', lang, { userName });
+        const content = i18n.t('emails.ban_notification.content', lang);
+        const reasonLabel = i18n.t('emails.ban_notification.reason_label', lang);
+        const actionText = i18n.t('emails.ban_notification.action_text', lang);
+        const appealText = i18n.t('emails.ban_notification.appeal_text', lang);
+        const footerText = i18n.t('emails.ban_notification.footer', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Security" <security@estatemarket.com>',
@@ -589,7 +599,7 @@ exports.sendBanEmail = async (to, userName, reason, lang = 'vi') => {
                         
                         <div style="background-color: #f9fafb; border-left: 4px solid #000000; padding: 20px; margin: 25px 0;">
                             <p style="margin: 0; font-weight: bold; color: #111827;">${reasonLabel}</p>
-                            <p style="margin: 10px 0 0; color: #4b5563; font-style: italic;">"${reason || (isEn ? 'Violation of terms of service' : 'Vi phạm điều khoản dịch vụ')}"</p>
+                            <p style="margin: 10px 0 0; color: #4b5563; font-style: italic;">"${reason}"</p>
                         </div>
 
                         <p style="color: #ef4444; font-weight: bold;">${actionText}</p>
@@ -613,15 +623,13 @@ exports.sendUnbanEmail = async (to, userName, lang = 'vi') => {
         if (!to) return;
         const isEn = lang === 'en';
 
-        const subject = isEn ? '✅ Account Restored Notification' : '✅ Thông báo khôi phục tài khoản';
-        const header = isEn ? 'Account Restored' : 'Tài khoản đã được mở khóa';
-        const greeting = isEn ? `Hello <strong>${userName}</strong>,` : `Xin chào <strong>${userName}</strong>,`;
-        const content = isEn 
-            ? `Good news! Your EstateMarket account has been <strong>restored</strong>. You can now log in and use all features of our platform again.` 
-            : `Tin vui! Tài khoản EstateMarket của bạn đã được <strong>khôi phục</strong>. Bây giờ bạn có thể đăng nhập và tiếp tục sử dụng tất cả các tính năng của hệ thống.`;
-        const welcomeBack = isEn ? `Welcome back to our community!` : `Chào mừng bạn quay trở lại với cộng đồng!`;
-        const btnText = isEn ? `Login Now` : `Đăng nhập ngay`;
-        const footerText = isEn ? `EstateMarket Support Team` : `Đội ngũ hỗ trợ EstateMarket`;
+        const subject = i18n.t('emails.unban_notification.subject', lang);
+        const header = i18n.t('emails.unban_notification.header', lang);
+        const greeting = i18n.t('emails.unban_notification.greeting', lang, { userName });
+        const content = i18n.t('emails.unban_notification.content', lang);
+        const welcomeBack = i18n.t('emails.unban_notification.welcome_back', lang);
+        const btnText = i18n.t('emails.unban_notification.login_now', lang);
+        const footerText = i18n.t('emails.unban_notification.footer', lang);
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
