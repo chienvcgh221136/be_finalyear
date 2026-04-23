@@ -293,6 +293,7 @@ exports.googleLogin = async (req, res) => {
                 isVerified: true,
                 role: "USER"
             });
+
         }
 
         const accessToken = jwt.sign(

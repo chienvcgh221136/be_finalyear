@@ -55,6 +55,21 @@ exports.createReport = async (req, res) => {
       relatedId: postId
     });
 
+    // 1.1 Send Confirmation Email to Reporter
+    const reporter = await User.findById(req.user.userId);
+    if (reporter && reporter.email) {
+      const emailService = require("../services/emailService");
+      const post = await Post.findById(postId);
+      await emailService.sendReportConfirmationEmail(
+        reporter.email,
+        reporter.name,
+        'POST',
+        post ? post.title : 'Bài đăng',
+        reason,
+        reporter.language || 'vi'
+      );
+    }
+
     // 2. Notify Admins (New Report Alert)
     const admins = await User.find({ role: "ADMIN" }, "_id");
     if (admins.length > 0) {
@@ -101,7 +116,6 @@ exports.createUserReport = async (req, res) => {
     });
 
     // Notify Admins
-    // ... (existing admin notification logic)
     const User = require("../models/UserModel");
     const admins = await User.find({ role: "ADMIN" }, "_id");
     if (admins.length > 0) {
@@ -115,6 +129,34 @@ exports.createUserReport = async (req, res) => {
       }));
       const Notification = require("../models/NotificationModel");
       await Notification.insertMany(adminNotifications);
+    }
+
+    // Notify Reporter (Confirmation Email + In-App)
+    const reporter = await User.findById(req.user.userId);
+    if (reporter) {
+      // In-App Notification
+      const NotificationController = require("./notificationController");
+      await NotificationController.createNotification({
+        recipientId: req.user.userId,
+        senderId: null, // System
+        type: "SYSTEM",
+        message: `Chúng tôi đã nhận được báo cáo của bạn về tài khoản người dùng. Cảm ơn bạn đã đóng góp cho cộng đồng.`,
+        relatedId: report._id
+      });
+
+      // Email Confirmation
+      if (reporter.email) {
+        const emailService = require("../services/emailService");
+        const targetUser = await User.findById(targetUserId);
+        await emailService.sendReportConfirmationEmail(
+          reporter.email,
+          reporter.name,
+          'USER',
+          targetUser ? targetUser.name : 'Người dùng',
+          reason,
+          reporter.language || 'vi'
+        );
+      }
     }
 
     res.json({ success: true, data: report });
@@ -229,4 +271,3 @@ exports.deleteReport = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-

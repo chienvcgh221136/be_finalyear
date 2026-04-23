@@ -662,3 +662,46 @@ exports.sendUnbanEmail = async (to, userName, lang = 'vi') => {
         return false;
     }
 };
+
+exports.sendReportConfirmationEmail = async (to, userName, type, targetName, reason, lang = 'vi') => {
+    try {
+        if (!to) return;
+        const subject = i18n.t('emails.report_confirmation.subject', lang);
+        const header = i18n.t('emails.report_confirmation.header', lang);
+        const greeting = i18n.t('emails.report_confirmation.greeting', lang, { userName });
+        const content = i18n.t('emails.report_confirmation.content', lang, { 
+            type: type === 'USER' ? i18n.t('emails.report_confirmation.type_user', lang) : i18n.t('emails.report_confirmation.type_post', lang),
+            targetName 
+        });
+        const reasonLabel = i18n.t('emails.report_confirmation.reason_label', lang);
+        const note = i18n.t('emails.report_confirmation.note', lang);
+        const thanks = i18n.t('emails.common.thanks', lang);
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
+            to: to,
+            subject: subject,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                    <div style="background-color: #3b82f6; padding: 25px; text-align: center;">
+                        <h2 style="color: white; margin: 0;">${header}</h2>
+                    </div>
+                    <div style="padding: 30px; background-color: #ffffff; color: #374151;">
+                        <p style="font-size: 16px;">${greeting}</p>
+                        <p style="line-height: 1.6;">${content}</p>
+                        <div style="background-color: #f3f4f6; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+                            <p style="margin: 0;"><strong>${reasonLabel}</strong> ${reason}</p>
+                        </div>
+                        <p style="font-size: 14px; color: #6b7280;">${note}</p>
+                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
+                        <p style="font-size: 12px; color: #9ca3af; text-align: center;">${thanks}</p>
+                    </div>
+                </div>
+            `,
+        });
+        return true;
+    } catch (error) {
+        console.error("Error sending report confirmation email:", error);
+        return false;
+    }
+};

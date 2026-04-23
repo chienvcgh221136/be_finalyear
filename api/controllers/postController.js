@@ -191,7 +191,18 @@ exports.getPostById = async (req, res) => {
             }
 
 
-            return res.json({ success: true, data: post });
+            // Check if user has favorited this post
+            let isFavorite = false;
+            if (req.user) {
+                const Favorite = require("../models/FavoriteModel");
+                const favorite = await Favorite.findOne({ 
+                    userId: req.user.userId, 
+                    postId: post._id 
+                });
+                isFavorite = !!favorite;
+            }
+
+            return res.json({ success: true, data: { ...post.toObject(), isFavorite } });
         }
 
         return res.status(404).json({ message: "Post not found or restricted" });
