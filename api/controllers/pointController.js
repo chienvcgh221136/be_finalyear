@@ -148,19 +148,16 @@ exports.redeemReward = async (req, res) => {
         }
 
         const cost = REWARDS[rewardKey].cost;
-        const user = await User.findById(userId);
-
-        if (user.points < cost) {
-            return res.status(400).json({ message: "Không đủ điểm." });
-        }
-
-        // 1. Deduct Points
+        
+        // 1. Deduct Points (This handles balance check and FIFO logging)
         await exports.spendPoints(userId, cost, `REDEEM_${rewardKey}`, `Đổi quà: ${REWARDS[rewardKey].label}`);
 
-        // Refresh user for updated balance and inventory
-        const updatedUser = await User.findById(userId);
+        // 2. Refresh user for updated balance and modify inventory
+        const user = await User.findById(userId);
 
-        res.json({ success: true, message: "Đổi quà thành công!", points: updatedUser.points, inventory: updatedUser.inventory });
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng." });
+        }
 
         // Initialize inventory if not exists
         if (!user.inventory) {
@@ -181,7 +178,7 @@ exports.redeemReward = async (req, res) => {
             if (user.vip.bonusLeadCredits === undefined) user.vip.bonusLeadCredits = 0;
         }
 
-        // 2. Grant Reward Logic
+        // 3. Grant Reward Logic
         switch (rewardKey) {
             case "ITEM_POST_PUSH":
                 user.inventory.postPush = (user.inventory.postPush || 0) + 1;
@@ -206,24 +203,22 @@ exports.redeemReward = async (req, res) => {
 
         await user.save();
 
-        // 3. Log Transaction
-        await PointLog.create({
-            userId,
-            type: "SPEND",
-            action: `REDEEM_${rewardKey}`,
-            points: cost,
-            description: `Đổi quà: ${REWARDS[rewardKey].label}`
-        });
-
         // 4. Send Notification
         await Notification.create({
             recipientId: userId,
             type: "POINT",
             message: `Bạn đã đổi thành công gói ${REWARDS[rewardKey].label}. -${cost} điểm.`,
-            relatedId: userId // or maybe null?
+            relatedId: userId
         });
 
-        // res.json({ success: true, message: "Đổi quà thành công!", points: user.points, inventory: user.inventory }); // Replaced above
+        // NOTE: spendPoints already creates a PointLog entry, so we don't need another one here.
+        
+        res.json({ 
+            success: true, 
+            message: "Đổi quà thành công!", 
+            points: user.points, 
+            inventory: user.inventory 
+        });
 
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

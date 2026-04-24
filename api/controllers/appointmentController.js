@@ -21,21 +21,37 @@ exports.createAppointment = async (req, res) => {
         const ap = await Appointment.create({
             postId: post._id,
             buyerId: req.user.userId,
-            sellerId: post.userId._id, // post.userId is now an object
+            sellerId: post.userId?._id || post.userId, 
             appointmentTime,
             note
         });
 
+        console.log(`[Appointment] Created: ${ap._id}. Sending emails...`);
+
         // Send Email to Sender (Buyer)
-        emailService.sendAppointmentRequestSender(buyer.email, buyer.name, post.title, appointmentTime, buyer.language || 'vi');
+        try {
+            const buyerSent = await emailService.sendAppointmentRequestSender(buyer.email, buyer.name, post.title, appointmentTime, buyer.language || 'vi');
+            console.log(`[Appointment] Buyer Email Status: ${buyerSent ? 'SUCCESS' : 'FAILED'} (${buyer.email})`);
+        } catch (emailErr) {
+            console.error("[Appointment] Buyer Email Error:", emailErr);
+        }
 
         // Send Email to Receiver (Seller)
-        emailService.sendAppointmentRequestReceiver(post.userId.email, post.userId.name, buyer.name, post.title, appointmentTime, note, post.userId.language || 'vi');
+        if (post.userId && post.userId.email) {
+            try {
+                const sellerSent = await emailService.sendAppointmentRequestReceiver(post.userId.email, post.userId.name, buyer.name, post.title, appointmentTime, note, post.userId.language || 'vi');
+                console.log(`[Appointment] Seller Email Status: ${sellerSent ? 'SUCCESS' : 'FAILED'} (${post.userId.email})`);
+            } catch (emailErr) {
+                console.error("[Appointment] Seller Email Error:", emailErr);
+            }
+        } else {
+            console.warn("[Appointment] Seller has no email or user not found. Skipping seller email.");
+        }
 
         // Notify Seller
         const NotificationController = require("./notificationController");
         await NotificationController.createNotification({
-            recipientId: post.userId._id,
+            recipientId: post.userId?._id || post.userId,
             senderId: req.user.userId,
             type: "APPOINTMENT",
             message: `${buyer.name} đã đặt lịch hẹn "${post.title}".`,

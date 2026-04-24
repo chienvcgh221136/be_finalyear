@@ -1,11 +1,12 @@
 const Report = require("../models/ReportModel");
 const Post = require("../models/PostModel");
+const i18n = require("../utils/i18n");
 
 exports.createReport = async (req, res) => {
   try {
     const { reason, description } = req.body;
     const { postId } = req.params;
-
+    const lang = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
     // 1. Check if there is ANY pending report for this post by this user
     const pendingReport = await Report.findOne({
       postId,
@@ -13,7 +14,15 @@ exports.createReport = async (req, res) => {
       status: "PENDING"
     });
     if (pendingReport)
-      return res.status(400).json({ success: false, message: "Bạn đang có báo cáo chờ xử lý cho bài đăng này" });
+      return res.status(400).json({ success: false, message: i18n.t("reports.error_pending_post", lang) });
+
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ success: false, message: i18n.t("reports.error_not_found", lang) });
+
+    // Check if the user is reporting their own post
+    if (post.userId.toString() === req.user.userId) {
+      return res.status(400).json({ success: false, message: i18n.t("reports.error_self_report_post", lang) });
+    }
 
     // 2. Check strict rule: Can only report again if post has been edited since last report
     const lastReport = await Report.findOne({
@@ -22,16 +31,12 @@ exports.createReport = async (req, res) => {
     }).sort({ createdAt: -1 });
 
     if (lastReport) {
-      const post = await Post.findById(postId);
-      if (!post) return res.status(404).json({ success: false, message: "Bài đăng không tồn tại" });
-
       // If post.updatedAt is OLDER than or EQUAL to lastReport.createdAt, it implies no changes made.
-      // Note: We compare timestamps.
       const lastReportTime = new Date(lastReport.createdAt).getTime();
       const postUpdateTime = new Date(post.updatedAt).getTime();
 
       if (postUpdateTime <= lastReportTime) {
-        return res.status(400).json({ success: false, message: "Bài đăng chưa được chỉnh sửa kể từ lần báo cáo trước. Bạn không thể báo cáo lại." });
+        return res.status(400).json({ success: false, message: i18n.t("reports.error_not_edited", lang) });
       }
     }
 
@@ -50,8 +55,8 @@ exports.createReport = async (req, res) => {
     await NotificationController.createNotification({
       recipientId: req.user.userId,
       senderId: null, // System
-      type: "SYSTEM", // or "REPORT_CONFIRMATION" if you want specific icon
-      message: `Chúng tôi đã nhận được báo cáo của bạn về bài đăng. Cảm ơn bạn đã đóng góp cho cộng đồng.`,
+      type: "SYSTEM",
+      message: i18n.t("notifications.patterns.report_received", lang),
       relatedId: postId
     });
 
@@ -64,9 +69,9 @@ exports.createReport = async (req, res) => {
         reporter.email,
         reporter.name,
         'POST',
-        post ? post.title : 'Bài đăng',
+        post ? post.title : i18n.t("notifications.patterns.target_your_post", lang),
         reason,
-        reporter.language || 'vi'
+        reporter.language || lang
       );
     }
 
@@ -77,7 +82,7 @@ exports.createReport = async (req, res) => {
         recipientId: admin._id,
         senderId: req.user.userId,
         type: "REPORT", // Special type key for Admin Dashboard
-        message: `Báo cáo mới từ người dùng về bài đăng (Lý do: ${reason}).`,
+        message: i18n.t("notifications.patterns.new_report_post", lang, { reason }),
         relatedId: postId,
         isRead: false
       }));
@@ -94,6 +99,11 @@ exports.createReport = async (req, res) => {
 exports.createUserReport = async (req, res) => {
   try {
     const { reason, description, targetUserId, chatRoomId } = req.body;
+    const lang = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
+
+    if (targetUserId === req.user.userId) {
+      return res.status(400).json({ success: false, message: i18n.t("reports.error_self_report_user", lang) });
+    }
 
     // 1. Check if there is ANY pending report for this user by this reporter
     const pendingReport = await Report.findOne({
@@ -104,7 +114,7 @@ exports.createUserReport = async (req, res) => {
     });
 
     if (pendingReport)
-      return res.status(400).json({ success: false, message: "Bạn đang có báo cáo chờ xử lý cho người dùng này" });
+      return res.status(400).json({ success: false, message: i18n.t("reports.error_pending_user", lang) });
 
     const report = await Report.create({
       targetUserId,
@@ -123,8 +133,8 @@ exports.createUserReport = async (req, res) => {
         recipientId: admin._id,
         senderId: req.user.userId,
         type: "REPORT",
-        message: `Báo cáo mới từ người dùng về một tài khoản (Lý do: ${reason}).`,
-        relatedId: report._id, // Use report ID or targetUserId? Report ID seems safer for admin link
+        message: i18n.t("notifications.patterns.new_report_user", lang, { reason }),
+        relatedId: report._id,
         isRead: false
       }));
       const Notification = require("../models/NotificationModel");
@@ -140,7 +150,7 @@ exports.createUserReport = async (req, res) => {
         recipientId: req.user.userId,
         senderId: null, // System
         type: "SYSTEM",
-        message: `Chúng tôi đã nhận được báo cáo của bạn về tài khoản người dùng. Cảm ơn bạn đã đóng góp cho cộng đồng.`,
+        message: i18n.t("notifications.patterns.report_received", lang),
         relatedId: report._id
       });
 
@@ -152,9 +162,9 @@ exports.createUserReport = async (req, res) => {
           reporter.email,
           reporter.name,
           'USER',
-          targetUser ? targetUser.name : 'Người dùng',
+          targetUser ? targetUser.name : i18n.t("notifications.patterns.target_your_account", lang),
           reason,
-          reporter.language || 'vi'
+          reporter.language || lang
         );
       }
     }
@@ -197,14 +207,13 @@ exports.resolveReport = async (req, res) => {
       .populate('targetUserId'); // Get reported user
 
     let owner = null;
-    let title = "Tài khoản của bạn"; // Default title for notification
-
     if (report.type === 'USER' && report.targetUserId) {
       owner = report.targetUserId;
     } else if (report.postId && report.postId.userId) {
       owner = report.postId.userId;
-      title = `Bài đăng "${report.postId.title}"`;
     }
+
+    const lang = owner.language || 'vi';
 
     if (owner) {
       // Increment violation count
@@ -221,16 +230,16 @@ exports.resolveReport = async (req, res) => {
             owner.name,
             report.reason,
             report.description,
-            owner.language || 'vi'
+            lang
           );
         } else {
           await emailService.sendViolationWarning(
             owner.email,
             owner.name,
-            report.postId ? report.postId.title : 'Bài đăng',
+            report.postId ? report.postId.title : i18n.t("notifications.patterns.target_your_post", lang),
             report.reason,
             report.description,
-            owner.language || 'vi'
+            lang
           );
         }
       } catch (emailError) {
@@ -239,11 +248,15 @@ exports.resolveReport = async (req, res) => {
 
       // Notify User (In-App)
       const NotificationController = require("./notificationController");
+      const targetLabel = report.type === 'USER' 
+        ? i18n.t("notifications.patterns.target_your_account", lang)
+        : (report.postId ? `"${report.postId.title}"` : i18n.t("notifications.patterns.target_your_post", lang));
+
       await NotificationController.createNotification({
         recipientId: owner._id,
         senderId: null, // System
         type: "REPORT",
-        message: `${title} đã bị báo cáo vi phạm: ${report.reason}. Vui lòng kiểm tra lại.`,
+        message: i18n.t("notifications.patterns.violation_alert", lang, { target: targetLabel, reason: report.reason }),
         relatedId: report.postId ? report.postId._id : null
       });
     }
@@ -255,18 +268,24 @@ exports.resolveReport = async (req, res) => {
 };
 
 exports.rejectReport = async (req, res) => {
-  const report = await Report.findByIdAndUpdate(
-    req.params.id,
-    { status: "REJECTED" },
-    { new: true }
-  );
-  res.json({ success: true, data: report });
+  try {
+    const lang = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
+    const report = await Report.findByIdAndUpdate(
+      req.params.id,
+      { status: "REJECTED" },
+      { new: true }
+    );
+    res.json({ success: true, data: report, message: i18n.t("reports.success_rejected", lang) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 exports.deleteReport = async (req, res) => {
   try {
+    const lang = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
     await Report.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Report deleted" });
+    res.json({ success: true, message: i18n.t("reports.success_deleted", lang) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

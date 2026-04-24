@@ -25,9 +25,14 @@ exports.createOrGetChat = async (req, res) => {
             // Chat exists, update the context (postId) to the new post
             chatRoom.postId = postId;
 
-            // If the user had previously deleted this chat, un-delete it
+            // If the user had previously deleted this chat, make it reappear
+            // by updating lastMessageAt to bypass the filter in getMyChats,
+            // but KEEP deletedAt so old messages remain hidden (fresh start).
             if (chatRoom.deletedBy && chatRoom.deletedBy.includes(buyerId)) {
                 chatRoom.deletedBy = chatRoom.deletedBy.filter(id => id.toString() !== buyerId);
+                chatRoom.lastMessageAt = new Date();
+                // Optionally clear the last message snippet for a cleaner "new" feel
+                chatRoom.lastMessage = ""; 
             }
 
             await chatRoom.save();

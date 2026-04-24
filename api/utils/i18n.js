@@ -19,6 +19,8 @@ const loadTranslations = () => {
             if (fs.existsSync(filePath)) {
                 const content = fs.readFileSync(filePath, 'utf8');
                 translations[lang] = JSON.parse(content);
+                console.log(`[i18n] Loaded ${lang} from: ${filePath}`);
+                console.log(`[i18n] Top level keys for ${lang}: ${Object.keys(translations[lang]).join(', ').substring(0, 100)}...`);
             } else {
                 console.warn(`[i18n] Translation file NOT found for ${lang} at ${filePath}`);
             }
@@ -55,9 +57,11 @@ const t = (key, lang = 'vi', data = {}) => {
     let value = getNestedValue(translations[lang], key);
 
     if (value === undefined) {
+        console.warn(`[i18n] Key NOT found: "${key}" for lang: "${lang}"`);
         // Fallback to Vietnamese if not found in English
         if (lang !== 'vi') {
             value = getNestedValue(translations['vi'], key);
+            if (value) console.log(`[i18n] Fallback to 'vi' for key: "${key}"`);
         }
         if (value === undefined) return null;
     }

@@ -237,7 +237,7 @@ exports.sendAppointmentRequestSender = async (to, userName, postTitle, time, lan
         const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN');
 
         await transporter.sendMail({
-            from: process.env.SMTP_FROM || '"EstateMarket Support" <support@estatemarket.com>',
+            from: process.env.SMTP_FROM || '"EstateMarket" <support@estatemarket.com>',
             to: to,
             subject: subject,
             html: `
@@ -272,9 +272,10 @@ exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postT
         const actionText = i18n.t('emails.appointment.receiver_note', lang);
         const btnText = i18n.t('emails.appointment.receiver_btn', lang);
         const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN');
+        console.log(`[EmailService] Preparing to send appointment receiver email to: ${to}, Subject: ${subject}`);
 
         await transporter.sendMail({
-            from: process.env.SMTP_FROM || '"EstateMarket System" <system@estatemarket.com>',
+            from: process.env.SMTP_FROM || '"EstateMarket" <support@estatemarket.com>',
             to: to,
             subject: subject,
             html: `
@@ -283,7 +284,7 @@ exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postT
                     <p>${greeting}</p>
                     <p>${content}</p>
                     <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(isEn ? 'en-US' : 'vi-VN')}</p>
+                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN')}</p>
                         <p style="margin: 5px 0;"><strong>${noteLabel}</strong> ${note || noNote}</p>
                     </div>
                     <p>${actionText}</p>
