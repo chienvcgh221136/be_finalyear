@@ -4,6 +4,7 @@ const Post = require("../models/PostModel");
 const User = require("../models/UserModel");
 
 const emailService = require("../services/emailService");
+const i18n = require("../utils/i18n");
 
 exports.createAppointment = async (req, res) => {
     try {
@@ -50,11 +51,15 @@ exports.createAppointment = async (req, res) => {
 
         // Notify Seller
         const NotificationController = require("./notificationController");
+        const buyerName = buyer.name || "Người dùng";
+        const postTitle = post.title || "Bất động sản";
+        const sellerLang = post.userId?.language || 'vi';
+
         await NotificationController.createNotification({
             recipientId: post.userId?._id || post.userId,
             senderId: req.user.userId,
             type: "APPOINTMENT",
-            message: `${buyer.name} đã đặt lịch hẹn "${post.title}".`,
+            message: i18n.t('notifications.patterns.appointment_new', sellerLang, { name: buyerName, title: postTitle }),
             relatedId: ap._id
         });
 
@@ -77,17 +82,31 @@ exports.updateStatus = async (req, res) => {
         await ap.save();
 
         // Send Email to Buyer
-        if (ap.buyerId && ap.buyerId.email) {
-            emailService.sendAppointmentStatusUpdate(ap.buyerId.email, ap.buyerId.name, ap.postId.title, ap.status, ap.appointmentTime, ap.buyerId.language || 'vi');
+        const buyerEmail = ap.buyerId?.email;
+        const buyerName = ap.buyerId?.name || "Người dùng";
+        const postTitle = ap.postId?.title || "Bất động sản";
+        const lang = ap.buyerId?.language || 'vi';
+
+        if (buyerEmail) {
+            emailService.sendAppointmentStatusUpdate(
+                buyerEmail, 
+                buyerName, 
+                postTitle, 
+                ap.status, 
+                ap.appointmentTime, 
+                lang
+            );
         }
 
         // Notify Buyer
         const NotificationController = require("./notificationController");
+        const statusKey = ap.status === 'APPROVED' ? 'appointment_accepted' : 'appointment_rejected';
+        
         await NotificationController.createNotification({
-            recipientId: ap.buyerId._id,
+            recipientId: ap.buyerId?._id || ap.buyerId,
             senderId: req.user.userId, // Seller
             type: "APPOINTMENT",
-            message: `Lịch hẹn "${ap.postId.title}" của bạn đã chuyển sang trạng thái: ${req.body.status}.`,
+            message: i18n.t(`notifications.patterns.${statusKey}`, lang, { post: postTitle }),
             relatedId: ap._id
         });
 

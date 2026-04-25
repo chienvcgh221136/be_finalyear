@@ -15,7 +15,7 @@ exports.toggleFavorite = async (req, res) => {
         const exist = await Favorite.findOne({ userId, postId });
         if (exist) {
             await exist.deleteOne();
-            return res.json({ success: true, message: i18n.t("favorites.success_unfavorited", lang) });
+            return res.json({ success: true, message: i18n.t("favorites.success_unfavorited", lang), isFavorite: false });
         }
 
         const post = await Post.findById(postId);
@@ -42,7 +42,7 @@ exports.toggleFavorite = async (req, res) => {
             });
         }
 
-        res.json({ success: true, message: i18n.t("favorites.success_favorited", lang) });
+        res.json({ success: true, message: i18n.t("favorites.success_favorited", lang), isFavorite: true });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }

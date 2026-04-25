@@ -48,29 +48,43 @@ const getNestedValue = (obj, path) => {
  * @param {Object} data - data for interpolation {{var}}
  */
 const t = (key, lang = 'vi', data = {}) => {
-    if (!translations[lang]) {
+    // 1. Ensure lang is a string and supported, otherwise fallback to 'vi'
+    let targetLang = (typeof lang === 'string' && ['vi', 'en'].includes(lang.toLowerCase())) 
+        ? lang.toLowerCase() 
+        : 'vi';
+
+    if (!translations[targetLang]) {
         // Try to reload once if missing
         if (Object.keys(translations).length === 0) loadTranslations();
-        if (!translations[lang]) return null;
+        if (!translations[targetLang]) {
+            // If still missing after reload, fallback to 'vi' if not already 'vi'
+            if (targetLang !== 'vi') targetLang = 'vi';
+            if (!translations[targetLang]) return key; // Ultimate fallback: return key
+        }
     }
 
-    let value = getNestedValue(translations[lang], key);
+    let value = getNestedValue(translations[targetLang], key);
 
     if (value === undefined) {
-        console.warn(`[i18n] Key NOT found: "${key}" for lang: "${lang}"`);
+        console.warn(`[i18n] Key NOT found: "${key}" for lang: "${targetLang}"`);
         // Fallback to Vietnamese if not found in English
-        if (lang !== 'vi') {
+        if (targetLang !== 'vi') {
             value = getNestedValue(translations['vi'], key);
             if (value) console.log(`[i18n] Fallback to 'vi' for key: "${key}"`);
         }
-        if (value === undefined) return null;
+        
+        if (value === undefined) {
+            return key; // Return the key itself instead of null to prevent validation errors
+        }
     }
 
     // Basic interpolation: replace {{var}} with data[var]
     if (typeof value === 'string') {
         Object.keys(data).forEach(dataKey => {
             const regex = new RegExp(`{{${dataKey}}}`, 'g');
-            value = value.replace(regex, data[dataKey]);
+            // Use fallback empty string for missing data to avoid "undefined" in text
+            const replacement = data[dataKey] !== undefined ? data[dataKey] : '';
+            value = value.replace(regex, replacement);
         });
     }
 

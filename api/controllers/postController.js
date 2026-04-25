@@ -195,9 +195,9 @@ exports.getPostById = async (req, res) => {
             let isFavorite = false;
             if (req.user) {
                 const Favorite = require("../models/FavoriteModel");
-                const favorite = await Favorite.findOne({ 
-                    userId: req.user.userId, 
-                    postId: post._id 
+                const favorite = await Favorite.findOne({
+                    userId: req.user.userId,
+                    postId: post._id
                 });
                 isFavorite = !!favorite;
             }

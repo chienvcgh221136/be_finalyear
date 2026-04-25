@@ -227,10 +227,13 @@ exports.sendWithdrawStatusUpdate = async (to, userName, status, amount, note, la
 exports.sendAppointmentRequestSender = async (to, userName, postTitle, time, lang = 'vi') => {
     try {
         if (!to) return;
+        const buyerName = userName || i18n.t('common.user', lang) || "Người dùng";
+        const displayTitle = postTitle || i18n.t('common.property', lang) || "Bất động sản";
+
         const subject = i18n.t('emails.appointment.sender_subject', lang);
         const header = i18n.t('emails.appointment.sender_header', lang);
-        const greeting = i18n.t('emails.appointment.sender_greeting', lang, { buyerName: userName });
-        const content = i18n.t('emails.appointment.sender_content', lang, { postTitle });
+        const greeting = i18n.t('emails.appointment.sender_greeting', lang, { buyerName });
+        const content = i18n.t('emails.appointment.sender_content', lang, { postTitle: displayTitle });
         const timeLabel = i18n.t('emails.appointment.sender_time', lang);
         const pendingWait = i18n.t('emails.appointment.sender_note', lang);
         const thanks = i18n.t('emails.common.thanks', lang);
@@ -262,10 +265,14 @@ exports.sendAppointmentRequestSender = async (to, userName, postTitle, time, lan
 exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postTitle, time, note, lang = 'vi') => {
     try {
         if (!to) return;
+        const sName = sellerName || i18n.t('common.user', lang) || "Người dùng";
+        const bName = buyerName || i18n.t('common.user', lang) || "Người dùng";
+        const displayTitle = postTitle || i18n.t('common.property', lang) || "Bất động sản";
+
         const subject = i18n.t('emails.appointment.receiver_subject', lang);
         const header = i18n.t('emails.appointment.receiver_header', lang);
-        const greeting = i18n.t('emails.appointment.receiver_greeting', lang, { sellerName });
-        const content = i18n.t('emails.appointment.receiver_content', lang, { buyerName, postTitle });
+        const greeting = i18n.t('emails.appointment.receiver_greeting', lang, { sellerName: sName });
+        const content = i18n.t('emails.appointment.receiver_content', lang, { buyerName: bName, postTitle: displayTitle });
         const timeLabel = i18n.t('emails.appointment.receiver_time', lang);
         const noteLabel = i18n.t('emails.appointment.update_note', lang) || 'Ghi chú:';
         const noNote = i18n.t('common.none', lang) || 'Không có';
@@ -306,9 +313,12 @@ exports.sendAppointmentStatusUpdate = async (to, userName, postTitle, status, ti
         const color = status === 'APPROVED' ? '#16a34a' : '#ef4444';
         const statusText = i18n.t(`emails.appointment.${statusKey}`, lang);
 
+        const bName = userName || i18n.t('common.user', lang) || "Người dùng";
+        const displayTitle = postTitle || i18n.t('common.property', lang) || "Bất động sản";
+
         const subject = i18n.t('emails.appointment.update_subject', lang);
-        const greeting = i18n.t('emails.appointment.update_greeting', lang, { buyerName: userName });
-        const content = i18n.t('emails.appointment.update_content', lang, { postTitle });
+        const greeting = i18n.t('emails.appointment.update_greeting', lang, { buyerName: bName });
+        const content = i18n.t('emails.appointment.update_content', lang, { postTitle: displayTitle });
         
         const approvedExtra = i18n.t('emails.appointment.update_note_approved', lang);
         const rejectedExtra = i18n.t('emails.appointment.update_note_rejected', lang);
@@ -337,6 +347,10 @@ exports.sendAppointmentStatusUpdate = async (to, userName, postTitle, status, ti
 };
 
 exports.sendViolationWarning = async (to, userName, postTitle, reason, description, lang = 'vi') => {
+    // Fallbacks for display
+    const displayName = userName || 'User';
+    const displayTitle = postTitle || 'your post';
+    
     try {
         if (!to) return;
         let reasonText = reason;
@@ -347,8 +361,8 @@ exports.sendViolationWarning = async (to, userName, postTitle, reason, descripti
 
         const subject = i18n.t('emails.moderation.violation_subject', lang);
         const header = i18n.t('emails.moderation.violation_header', lang);
-        const greeting = i18n.t('emails.moderation.violation_greeting', lang, { userName });
-        const content = i18n.t('emails.moderation.violation_content', lang, { postTitle });
+        const greeting = i18n.t('emails.moderation.violation_greeting', lang, { userName: displayName });
+        const content = i18n.t('emails.moderation.violation_content', lang, { postTitle: displayTitle });
         const reasonLabel = i18n.t('emails.moderation.violation_reason', lang);
         const detailLabel = i18n.t('emails.moderation.violation_details_label', lang);
         const warningAction = i18n.t('emails.moderation.violation_note', lang);
@@ -393,6 +407,9 @@ exports.sendViolationWarning = async (to, userName, postTitle, reason, descripti
 };
 
 exports.sendUserViolationWarning = async (to, userName, reason, description, lang = 'vi') => {
+    // Fallbacks for display
+    const displayName = userName || 'User';
+    
     try {
         if (!to) return;
         let reasonText = reason;
@@ -403,7 +420,7 @@ exports.sendUserViolationWarning = async (to, userName, reason, description, lan
 
         const subject = i18n.t('emails.moderation.user_violation_subject', lang);
         const header = i18n.t('emails.moderation.user_violation_header', lang);
-        const greeting = i18n.t('emails.moderation.user_violation_greeting', lang, { userName });
+        const greeting = i18n.t('emails.moderation.user_violation_greeting', lang, { userName: displayName });
         const content = i18n.t('emails.moderation.user_violation_content', lang);
         const reasonLabel = i18n.t('emails.moderation.user_violation_reason', lang);
         const detailLabel = i18n.t('emails.moderation.violation_details_label', lang);
@@ -665,14 +682,18 @@ exports.sendUnbanEmail = async (to, userName, lang = 'vi') => {
 };
 
 exports.sendReportConfirmationEmail = async (to, userName, type, targetName, reason, lang = 'vi') => {
+    // Fallbacks for display
+    const displayName = userName || 'User';
+    const displayTarget = targetName || 'the item';
+    
     try {
         if (!to) return;
         const subject = i18n.t('emails.report_confirmation.subject', lang);
         const header = i18n.t('emails.report_confirmation.header', lang);
-        const greeting = i18n.t('emails.report_confirmation.greeting', lang, { userName });
+        const greeting = i18n.t('emails.report_confirmation.greeting', lang, { userName: displayName });
         const content = i18n.t('emails.report_confirmation.content', lang, { 
             type: type === 'USER' ? i18n.t('emails.report_confirmation.type_user', lang) : i18n.t('emails.report_confirmation.type_post', lang),
-            targetName 
+            targetName: displayTarget 
         });
         const reasonLabel = i18n.t('emails.report_confirmation.reason_label', lang);
         const note = i18n.t('emails.report_confirmation.note', lang);

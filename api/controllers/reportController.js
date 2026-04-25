@@ -86,8 +86,12 @@ exports.createReport = async (req, res) => {
         relatedId: postId,
         isRead: false
       }));
-      const Notification = require("../models/NotificationModel");
-      await Notification.insertMany(adminNotifications);
+      try {
+        const Notification = require("../models/NotificationModel");
+        await Notification.insertMany(adminNotifications);
+      } catch (adminNotifErr) {
+        console.error("Failed to create admin notifications:", adminNotifErr);
+      }
     }
 
     res.json({ success: true, data: report });
@@ -137,8 +141,12 @@ exports.createUserReport = async (req, res) => {
         relatedId: report._id,
         isRead: false
       }));
-      const Notification = require("../models/NotificationModel");
-      await Notification.insertMany(adminNotifications);
+      try {
+        const Notification = require("../models/NotificationModel");
+        await Notification.insertMany(adminNotifications);
+      } catch (adminNotifErr) {
+        console.error("Failed to create admin notifications (USER report):", adminNotifErr);
+      }
     }
 
     // Notify Reporter (Confirmation Email + In-App)
@@ -213,9 +221,8 @@ exports.resolveReport = async (req, res) => {
       owner = report.postId.userId;
     }
 
-    const lang = owner.language || 'vi';
-
     if (owner) {
+      const lang = owner.language || 'vi';
       // Increment violation count
       owner.violationCount = (owner.violationCount || 0) + 1;
       await owner.save();

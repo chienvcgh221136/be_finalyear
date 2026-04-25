@@ -9,9 +9,9 @@ const i18n = require("../utils/i18n");
 // Constants for Reward Costs
 const REWARDS = {
     "ITEM_POST_PUSH": { cost: 50, label: "Đẩy Tin (1 lần)" },
-    "ITEM_VIP_BRONZE_1DAY": { cost: 500, label: "VIP Bronze (1 Ngày)" },
-    "ITEM_VIP_SILVER_3DAY": { cost: 1000, label: "VIP Silver (3 Ngày)" },
-    "ITEM_VIP_GOLD_7DAY": { cost: 2000, label: "VIP Gold (7 Ngày)" },
+    "ITEM_VIP_BRONZE_1DAY": { cost: 100, label: "VIP Bronze (1 Ngày)" },
+    "ITEM_VIP_SILVER_3DAY": { cost: 250, label: "VIP Silver (3 Ngày)" },
+    "ITEM_VIP_GOLD_7DAY": { cost: 500, label: "VIP Gold (7 Ngày)" },
     "LEAD_CREDIT": { cost: 50, label: "Xem 1 Lead (SĐT)" }
 };
 
@@ -148,7 +148,7 @@ exports.redeemReward = async (req, res) => {
         }
 
         const cost = REWARDS[rewardKey].cost;
-        
+
         // 1. Deduct Points (This handles balance check and FIFO logging)
         await exports.spendPoints(userId, cost, `REDEEM_${rewardKey}`, `Đổi quà: ${REWARDS[rewardKey].label}`);
 
@@ -212,12 +212,12 @@ exports.redeemReward = async (req, res) => {
         });
 
         // NOTE: spendPoints already creates a PointLog entry, so we don't need another one here.
-        
-        res.json({ 
-            success: true, 
-            message: "Đổi quà thành công!", 
-            points: user.points, 
-            inventory: user.inventory 
+
+        res.json({
+            success: true,
+            message: "Đổi quà thành công!",
+            points: user.points,
+            inventory: user.inventory
         });
 
     } catch (err) {
@@ -477,7 +477,7 @@ exports.adjustUserPoints = async (req, res) => {
         if (!user) return res.status(404).json({ message: "User not found" });
 
         // Check if this is the profile reward
-        if (description === "admin.points.adjustment_reasons.profile" || 
+        if (description === "admin.points.adjustment_reasons.profile" ||
             description === "Thưởng cập nhật hồ sơ cá nhân đầy đủ + ảnh đại diện") {
             user.isProfileRewardGiven = true;
             await user.save();
