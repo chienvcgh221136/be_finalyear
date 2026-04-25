@@ -1,12 +1,29 @@
 const fs = require('fs');
 const path = require('path');
 
-// 1. Try to read from local 'server/locales' folder (for deployment)
-let localesPath = path.join(__dirname, '../../locales');
+// Path configuration for locales
+let localesPath;
 
-// 2. If 'server/locales' doesn't exist, fallback to Mono-Repo mode
-if (!fs.existsSync(localesPath)) {
-    localesPath = path.join(__dirname, '../../../client/src/locales');
+if (process.env.LOCALES_PATH) {
+    // 1. Priority: Environment variable (good for flexible deployment)
+    localesPath = path.isAbsolute(process.env.LOCALES_PATH) 
+        ? process.env.LOCALES_PATH 
+        : path.join(process.cwd(), process.env.LOCALES_PATH);
+} else {
+    // 2. Try 'server/locales' relative to this file (standard server deployment)
+    const serverLocales = path.join(__dirname, '../../locales');
+    
+    // 3. Fallback to mono-repo structure
+    const monoRepoLocales = path.join(__dirname, '../../../client/src/locales');
+
+    if (fs.existsSync(serverLocales)) {
+        localesPath = serverLocales;
+    } else if (fs.existsSync(monoRepoLocales)) {
+        localesPath = monoRepoLocales;
+    } else {
+        // Ultimate fallback: check current working directory
+        localesPath = path.join(process.cwd(), 'locales');
+    }
 }
 
 const translations = {};
