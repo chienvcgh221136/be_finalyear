@@ -34,7 +34,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", 
+    origin: "*",
     credentials: true
   }
 });
@@ -99,15 +99,15 @@ app.get("/api/ping", (req, res) => {
 
 
 io.on("connection", (socket) => {
-  console.log("📡 New client connected:", socket.id);
+  console.log("New client connected:", socket.id);
 
   socket.on("join_room", (roomId) => {
     socket.join(roomId);
-    console.log(`👤 User joined room: ${roomId}`);
+    console.log(`User joined room: ${roomId}`);
   });
 
   socket.on("disconnect", () => {
-    console.log("🔌 Client disconnected");
+    console.log("Client disconnected");
   });
 });
 
