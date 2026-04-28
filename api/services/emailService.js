@@ -237,7 +237,7 @@ exports.sendAppointmentRequestSender = async (to, userName, postTitle, time, lan
         const timeLabel = i18n.t('emails.appointment.sender_time', lang);
         const pendingWait = i18n.t('emails.appointment.sender_note', lang);
         const thanks = i18n.t('emails.common.thanks', lang);
-        const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN');
+        const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || '"EstateMarket" <support@estatemarket.com>',
@@ -278,7 +278,7 @@ exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postT
         const noNote = i18n.t('common.none', lang) || 'Không có';
         const actionText = i18n.t('emails.appointment.receiver_note', lang);
         const btnText = i18n.t('emails.appointment.receiver_btn', lang);
-        const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN');
+        const formattedTime = new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
         console.log(`[EmailService] Preparing to send appointment receiver email to: ${to}, Subject: ${subject}`);
 
         await transporter.sendMail({
@@ -291,7 +291,7 @@ exports.sendAppointmentRequestReceiver = async (to, sellerName, buyerName, postT
                     <p>${greeting}</p>
                     <p>${content}</p>
                     <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN')}</p>
+                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</p>
                         <p style="margin: 5px 0;"><strong>${noteLabel}</strong> ${note || noNote}</p>
                     </div>
                     <p>${actionText}</p>
@@ -319,7 +319,7 @@ exports.sendAppointmentStatusUpdate = async (to, userName, postTitle, status, ti
         const subject = i18n.t('emails.appointment.update_subject', lang);
         const greeting = i18n.t('emails.appointment.update_greeting', lang, { buyerName: bName });
         const content = i18n.t('emails.appointment.update_content', lang, { postTitle: displayTitle });
-        
+
         const approvedExtra = i18n.t('emails.appointment.update_note_approved', lang);
         const rejectedExtra = i18n.t('emails.appointment.update_note_rejected', lang);
         const thanks = i18n.t('emails.common.thanks', lang);
@@ -350,7 +350,7 @@ exports.sendViolationWarning = async (to, userName, postTitle, reason, descripti
     // Fallbacks for display
     const displayName = userName || 'User';
     const displayTitle = postTitle || 'your post';
-    
+
     try {
         if (!to) return;
         let reasonText = reason;
@@ -409,7 +409,7 @@ exports.sendViolationWarning = async (to, userName, postTitle, reason, descripti
 exports.sendUserViolationWarning = async (to, userName, reason, description, lang = 'vi') => {
     // Fallbacks for display
     const displayName = userName || 'User';
-    
+
     try {
         if (!to) return;
         let reasonText = reason;
@@ -487,7 +487,7 @@ exports.sendAppointmentReminderSeller = async (to, sellerName, buyerName, postTi
                     <p>${greeting}</p>
                     <p>${content}</p>
                     <div style="background-color: #fffbeb; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #fcd34d;">
-                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN')}</p>
+                        <p style="margin: 5px 0;"><strong>${timeLabel}</strong> ${new Date(time).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</p>
                         <p style="margin: 5px 0; font-size: 13px; color: #b45309;">${overdueText}</p>
                     </div>
                     <p>${actionText}</p>
@@ -685,15 +685,15 @@ exports.sendReportConfirmationEmail = async (to, userName, type, targetName, rea
     // Fallbacks for display
     const displayName = userName || 'User';
     const displayTarget = targetName || 'the item';
-    
+
     try {
         if (!to) return;
         const subject = i18n.t('emails.report_confirmation.subject', lang);
         const header = i18n.t('emails.report_confirmation.header', lang);
         const greeting = i18n.t('emails.report_confirmation.greeting', lang, { userName: displayName });
-        const content = i18n.t('emails.report_confirmation.content', lang, { 
+        const content = i18n.t('emails.report_confirmation.content', lang, {
             type: type === 'USER' ? i18n.t('emails.report_confirmation.type_user', lang) : i18n.t('emails.report_confirmation.type_post', lang),
-            targetName: displayTarget 
+            targetName: displayTarget
         });
         const reasonLabel = i18n.t('emails.report_confirmation.reason_label', lang);
         const note = i18n.t('emails.report_confirmation.note', lang);
