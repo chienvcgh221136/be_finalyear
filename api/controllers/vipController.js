@@ -149,7 +149,7 @@ exports.upgradeVip = async (req, res) => {
             return res.status(400).json({ message: "Insufficient balance." });
         }
 
-     
+
         wallet.balance -= upgradeCost;
         wallet.totalSpent += upgradeCost;
         await wallet.save();

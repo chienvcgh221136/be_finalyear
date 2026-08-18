@@ -1,8 +1,6 @@
 const Appointment = require("../models/AppointmentModel");
 const Post = require("../models/PostModel");
-
 const User = require("../models/UserModel");
-
 const emailService = require("../services/emailService");
 const i18n = require("../utils/i18n");
 

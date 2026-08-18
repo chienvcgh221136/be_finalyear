@@ -81,6 +81,15 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (err) {
     console.error("Update profile error:", err);
+
+    // Handle duplicate phone number (MongoDB E11000)
+    if (err.code === 11000 && err.keyPattern && err.keyPattern.phone) {
+      return res.status(409).json({
+        success: false,
+        message: "Số điện thoại này đã được sử dụng bởi tài khoản khác."
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Error updating profile",

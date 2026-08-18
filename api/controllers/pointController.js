@@ -518,7 +518,7 @@ exports.adjustUserPoints = async (req, res) => {
 
         const updatedUser = await User.findById(userId);
 
-        console.log("DEBUG: PointLog Enum Values:", PointLog.schema.path('action').enumValues); // Check if ADMIN_ADJUSTMENT is here
+        console.log("DEBUG: PointLog Enum Values:", PointLog.schema.path('action').enumValues); // Check if ADMIN is here
 
         let notifMessage = "";
         let notifType = "POINT";

@@ -1,0 +1,7 @@
+2026-08-18T12:11:06.383Z - Error: 404 {"error":{"message":"The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.","type":"invalid_request_error","code":"model_not_found"}}
+    at APIError.generate (D:\final_project - main\server\node_modules\groq-sdk\error.js:49:20)
+    at Groq.makeStatusError (D:\final_project - main\server\node_modules\groq-sdk\core.js:293:33)
+    at Groq.makeRequest (D:\final_project - main\server\node_modules\groq-sdk\core.js:339:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.generateChatResponse (D:\final_project - main\server\api\services\aiService.js:132:26)
+    at async handleQuery (D:\final_project - main\server\api\controllers\chatbotController.js:184:26)

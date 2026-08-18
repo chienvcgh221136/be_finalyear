@@ -138,7 +138,6 @@ exports.sepayWebhook = async (req, res) => {
             refId: null
         });
 
-        // --- POINT EARNING LOGIC ---
         const pointController = require("./pointController");
         let pointsEarned = Math.floor(amount / 1000);
         let bonusPoints = 0;
@@ -157,13 +156,11 @@ exports.sepayWebhook = async (req, res) => {
             );
         }
 
-        // Send Email Notification
         if (user && user.email) {
             emailService.sendTopupSuccessEmail(user.email, user.name, amount, wallet.balance, user.language || 'vi')
                 .catch(err => console.error("Failed to send email:", err));
         }
 
-        // Notify User
         const NotificationController = require("./notificationController");
         let notifMessage = `Nạp tiền thành công (Sepay): +${amount.toLocaleString('vi-VN')}đ. Số dư hiện tại: ${wallet.balance.toLocaleString('vi-VN')}đ.`;
         if (pointsEarned > 0) {

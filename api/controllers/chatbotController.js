@@ -16,7 +16,6 @@ function createFuzzyRegex(str) {
         'd': '[dđDĐ]'
     };
     
-    // Explicitly strip ALL Vietnamese characters to base a-z
     let normalized = str.toLowerCase();
     normalized = normalized.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
     normalized = normalized.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");

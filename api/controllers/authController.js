@@ -121,15 +121,13 @@ exports.login = async (req, res) => {
         user.refreshToken = refreshToken;
         await user.save();
 
-        // Define shared cookie options
         const cookieOptions = {
             httpOnly: true,
-            secure: true, // Always true for cross-domain HTTPS (Render/Vercel)
+            secure: true, 
             sameSite: 'none',
             maxAge: 1 * 24 * 60 * 60 * 1000 // 1 day
         };
 
-        // If in development (localhost), use more relaxed settings
         if (process.env.NODE_ENV !== 'production') {
             cookieOptions.secure = false;
             cookieOptions.sameSite = 'lax';
@@ -256,7 +254,7 @@ exports.googleLogin = async (req, res) => {
             idToken: token,
             audience: process.env.GOOGLE_CLIENT_ID,
             // Add a small leeway for clock skew between servers
-            clockSkewLeeway: 30, 
+            clockSkewLeeway: 30,
         });
         const payload = ticket.getPayload();
         if (!payload) {
@@ -264,7 +262,7 @@ exports.googleLogin = async (req, res) => {
         }
 
         const { sub: googleId, name, picture } = payload;
-        
+
         if (!payload.email) {
             throw new Error("Google account does not provide an email address");
         }
@@ -368,10 +366,10 @@ exports.googleLogin = async (req, res) => {
 
     } catch (err) {
         console.error("Google Login Error:", err);
-        res.status(500).json({ 
-            success: false, 
-            message: "Google Login failed: " + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: "Google Login failed: " + err.message,
+            error: err.message
         });
     }
 };

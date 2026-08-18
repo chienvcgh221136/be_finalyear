@@ -50,7 +50,7 @@ const extractSearchParams = async (userQuery) => {
 
         const response = await groq.chat.completions.create({
             messages: [{ role: "user", content: prompt }],
-            model: "llama-3.1-8b-instant",
+            model: "groq/compound-mini",
             temperature: 0,
             response_format: { type: "json_object" }
         });
@@ -131,7 +131,7 @@ const generateChatResponse = async (userQuery, posts, stats = null, vipPackages 
 
         const response = await groq.chat.completions.create({
             messages: messages,
-            model: "llama-3.3-70b-versatile",
+            model: "groq/compound",
             temperature: 0,
         });
         return response.choices[0].message.content;

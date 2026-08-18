@@ -56,7 +56,7 @@ exports.showPhone = async (req, res) => {
                 usedBonus = true;
                 await currentUser.save();
             }
-            // Nếu KHÔNG CÓ bonus mới kiểm tra LIMIT của gói VIP
+            // Nếu k có bonus mới kiểm tra Limit của gói VIP
             else if (todayCount >= limit) {
                 if (!isVipValid) {
                     return res.status(403).json({

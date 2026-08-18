@@ -4,11 +4,10 @@ const User = require('../models/UserModel');
 
 
 
-// 4.2 Rest Daily Limits (00:00)
+// Rest Daily Limits (00:00)
 cron.schedule('0 0 * * *', async () => {
     console.log('[CRON] Running Daily VIP Reset...');
     try {
-        // 1. Force detach ALL VIP posts system-wide for reliability
         await Post.updateMany(
             { "vip.isActive": true },
             {
@@ -22,7 +21,6 @@ cron.schedule('0 0 * * *', async () => {
             }
         );
 
-        // Find all users with active VIP OR those who have used slots/posts
         const users = await User.find({
             $or: [
                 { "vip.isActive": true },
@@ -32,11 +30,11 @@ cron.schedule('0 0 * * *', async () => {
         });
 
         for (const user of users) {
-            // 2. Reset Limits
+            // Reset Limits
             user.vip.dailyUsedSlots = 0;
             user.vip.currentVipPosts = [];
 
-            // 3. Check Expiration
+            // Check Expiration
             if (user.vip.expiredAt) {
                 if (new Date(user.vip.expiredAt) < new Date()) {
                     user.vip.isActive = false;
@@ -57,7 +55,7 @@ cron.schedule('0 0 * * *', async () => {
     timezone: "Asia/Ho_Chi_Minh"
 });
 
-// 4.3 Backup Expiration Check (Every 1 minute)
+// Backup Expiration Check (Every 1 minute)
 cron.schedule('* * * * *', async () => {
     try {
         const now = new Date();
